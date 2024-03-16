@@ -1,9 +1,10 @@
 // import { useState } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css'
-import ReactFlow, { Background, Controls, Handle, Position, ReactFlowProvider, applyNodeChanges, useEdgesState, useNodesState, useReactFlow, useStore, useStoreApi, useViewport } from 'reactflow';
-import type {Dimensions, Node, NodeChange, NodeProps, NodeTypes, Rect, XYPosition} from 'reactflow'
+import ReactFlow, { Background, Controls, Handle, NodeToolbar, Position, ReactFlowProvider, applyNodeChanges, useEdgesState, useNodesState, useReactFlow, useStore, useStoreApi, useViewport } from 'reactflow';
+import type {Dimensions, HandleProps, Node, NodeChange, NodeProps, NodeTypes, Rect, XYPosition} from 'reactflow'
 import 'reactflow/dist/style.css';
+import { Button } from '@/components/ui/button';
 
 interface GridLine {
   xList: number[]
@@ -111,14 +112,58 @@ type GridNodeData = {
   column: number
 }
 
+interface NodeHandler {
+  position: Position
+}
+
 function GridNode({sourcePosition, isConnectable, data, id}: NodeProps<GridNodeData>) {
+  const [toolbarVisible, setToolbarVisible] = useState(false)
+  const [handlers, setHandlers] = useState<HandleProps[]>([])
+
+  useEffect(() => {
+    addHandler(Position.Left)
+    addHandler(Position.Right)
+  }, [])
+
+  function hideToolbarDelay() {
+    setTimeout(() => setToolbarVisible(false), 500)
+  }
+
+  function addHandler(position: Position) {
+    const type = position === Position.Top || Position.Left ? 'target' : 'source'
+    console.log('addHandler', position, type)
+    setHandlers(handlers => {
+      const newHandler: HandleProps = {
+        id: `${id}-${position}-${handlers.length+1}`,
+        type,
+        position,
+        isConnectable: true
+      }
+      return [...handlers, newHandler]
+    })
+  }
+
   return (
-    <div style={{width: '100px', height: '50px'}} className='border-black rounded-md border-2'>
-      <p>{data.column}</p>
-      <p>{id}</p>
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
-      <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
-    </div>
+    <>
+      <NodeToolbar position={Position.Top}>
+        <Button onClick={() => addHandler(Position.Top)}>Top</Button>
+        <Button onClick={() => addHandler(Position.Left)}>Left</Button>
+        <Button onClick={() => addHandler(Position.Right)}>Right</Button>
+      </NodeToolbar>
+      <div
+        style={{width: '100px', height: '50px'}} className='border-black rounded-md border-2'
+        onMouseEnter={() => setToolbarVisible(true)}
+        onMouseLeave={() => hideToolbarDelay()}
+        >
+        <p>{data.column}</p>
+        <p>{id}</p>
+        {
+          handlers.map(props => 
+            <Handle key={props.id} {...props} />
+          )
+        }
+      </div>
+    </>
   )
 }
 
