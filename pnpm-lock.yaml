@@ -32,6 +32,9 @@ dependencies:
   tailwindcss-animate:
     specifier: ^1.0.7
     version: 1.0.7(tailwindcss@3.4.1)
+  zustand:
+    specifier: ^4.5.2
+    version: 4.5.2(@types/react@18.2.65)(react@18.2.0)
 
 devDependencies:
   '@types/react':

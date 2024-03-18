@@ -1,10 +1,11 @@
 // import { useState } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css'
-import ReactFlow, { Background, Controls, Handle, NodeToolbar, Position, ReactFlowProvider, applyNodeChanges, useEdgesState, useNodesState, useReactFlow, useStore, useStoreApi, useViewport } from 'reactflow';
-import type {Dimensions, HandleProps, Node, NodeChange, NodeProps, NodeTypes, Rect, XYPosition} from 'reactflow'
+import ReactFlow, { Controls, Handle, NodeToolbar, Position, ReactFlowProvider, addEdge, applyEdgeChanges, applyNodeChanges, useReactFlow, useStoreApi, useUpdateNodeInternals, useViewport } from 'reactflow';
+import type {Connection, Dimensions, Edge, EdgeChange, HandleProps, Node, NodeChange, NodeProps, NodeTypes, OnConnect, OnConnectStart, OnConnectStartParams, OnEdgesChange, OnNodesChange, Rect, XYPosition} from 'reactflow'
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
+import {create} from 'zustand'
 
 interface GridLine {
   xList: number[]
@@ -21,6 +22,9 @@ interface Cell {
   column: number
   nodeId?: string
 }
+
+const GRID_NODE_TYPE_NAME = 'gridNode' as const
+type GRID_NODE = Node<GridNodeData, string | undefined>
 
 function zoomCell(cell: Cell | null, zoom: number): Cell | null {
   if (cell === null) return null
@@ -60,6 +64,10 @@ class LayoutManager {
         this.cells.push({rect, row, column})
       }
     }
+  }
+
+  getFirstCell(): Cell | null {
+    return this.cells[0]
   }
 
   layoutGridNodes(nodes: GRID_NODE[]): GRID_NODE[] {
@@ -110,65 +118,181 @@ class LayoutManager {
 type GridNodeData = {
   row: number
   column: number
+  
 }
 
-interface NodeHandler {
-  position: Position
+// const handlerMap: Map<string, HandleProps[]> = new Map()
+type HandlerProps = HandleProps & {isInitialHandler: boolean}
+
+type HandlerMap = Record<string, HandlerProps[]>
+
+type AppStore = {
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  onConnect: OnConnect;
+  setNodes: (nodes: Node[]) => void;
+  setEdges: (edges: Edge[]) => void;
+  setNode: (nodeId: string, c: (node: Node) => void) => void
+  addNode: (node: Omit<Node, 'id'>) => void
+  getNode: (nodeId: string) => Node | null
+  handlerMap: HandlerMap
+  getHandlers(nodeId: string): HandlerProps[]
+  addHandler(nodeId: string, type: 'source' | 'target', isInitialHandler: boolean): string
+  connectNodes(sourceNodeId: string, targetNodeId: string): void
+  reset(): void
 }
 
-function GridNode({sourcePosition, isConnectable, data, id}: NodeProps<GridNodeData>) {
+const useStore = create<AppStore>((set, get) => ({
+  nodes: [],
+  edges: [],
+  onNodesChange: (changes: NodeChange[]) => {
+    set({
+      nodes: applyNodeChanges(changes, get().nodes),
+    });
+  },
+  onEdgesChange: (changes: EdgeChange[]) => {
+    set({
+      edges: applyEdgeChanges(changes, get().edges),
+    });
+  },
+  onConnect: (connection: Connection) => {
+    set({
+      edges: addEdge(connection, get().edges),
+    });
+  },
+  setNodes: (nodes: Node[]) => {
+    set({ nodes });
+  },
+  setNode: (nodeId, c) => {
+    const node = get().nodes.filter(n => n.id === nodeId)[0]
+    if (node === undefined) return
+    c(node)
+    set({ nodes: [...get().nodes, node]})
+  },
+  addNode: (node) => {
+    const newNode = {
+      ...node,
+      type: GRID_NODE_TYPE_NAME,
+      id: String(get().nodes.length + 1)
+    }
+    get().addHandler(newNode.id, 'source', true)
+    get().addHandler(newNode.id, 'target', true)
+    set({ nodes: [...get().nodes, newNode] });
+  },
+  getNode: (nodeId: string) => {
+    return get().nodes.filter(n => n.id === nodeId)[0]
+  },
+  setEdges: (edges: Edge[]) => {
+    set({ edges });
+  },
+  handlerMap: {},
+  getHandlers(nodeId) {
+    return get().handlerMap[nodeId] ?? []
+  },
+  addHandler: (nodeId, type, isInitialHandler): string => {
+    let handlerId = ''
+    set((state) => {
+      const handlers = state.handlerMap[nodeId] ?? []
+      // console.log('handler', nodeId, type, isInitialHandler)
+      // const hasInitSource = handlers.filter(h => h.type === 'source' && h.isInitialHandler == true).length > 0
+      // const hasInitTarget = handlers.filter(h => h.type === 'target' && h.isInitialHandler == true).length > 0
+      // console.log(`hasInitSource: ${hasInitSource}, hasInitTarget: ${hasInitTarget}`)
+      // if (hasInitSource && hasInitTarget) return state
+
+      handlerId = `${type}_${handlers.length+1}_${isInitialHandler}`
+      // console.log('handlerId', handlerId)
+      const newHandler: HandlerProps = {
+        id: handlerId,
+        type,
+        position: type === 'source' ? Position.Right : Position.Left,
+        isConnectable: true,
+        isConnectableStart: type==='source',
+        isConnectableEnd: type==='target',
+        isInitialHandler,
+      }
+      const m = {handlerMap: {...state.handlerMap, [nodeId]: [...handlers, newHandler]}}
+      // console.log('m', m)
+      return m
+    })
+    return handlerId
+  },
+  connectNodes: (sourceNodeId: string, targetNodeId: string) => {
+    const addHandler = get().addHandler
+    const sourceHandlerId = addHandler(sourceNodeId, 'source', false)
+    const targetHandlerId = addHandler(targetNodeId, 'target', false)
+    const edge: Edge = {
+      id: `${sourceNodeId}_${sourceHandlerId}:${targetNodeId}_${targetHandlerId}`,
+      source: sourceNodeId,
+      sourceHandle: sourceHandlerId,
+      target: targetNodeId,
+      targetHandle: targetHandlerId,
+    }
+    console.log('connectNodes', edge)
+    console.log('all handles', get().handlerMap)
+    get().setEdges([...get().edges, edge])
+  },
+  reset() {
+    get().setNodes([])
+    get().setEdges([])
+    get().handlerMap = {}
+  },
+}))
+
+function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<GridNodeData>) {
   const [toolbarVisible, setToolbarVisible] = useState(false)
-  const [handlers, setHandlers] = useState<HandleProps[]>([])
+  const handlers = useStore(state => state.getHandlers(nodeId))
+  // const updateNodeInternals = useUpdateNodeInternals()
+  // const addHandler = useStore(state => state.addHandler)
 
-  useEffect(() => {
-    addHandler(Position.Left)
-    addHandler(Position.Right)
-  }, [])
+  // useEffect(() => {
+  //   console.log(`GridNode init, nodeId: ${nodeId}`)
+  //   addHandler(nodeId, 'source', true)
+  //   addHandler(nodeId, 'target', true)
+  // }, [])
 
   function hideToolbarDelay() {
     setTimeout(() => setToolbarVisible(false), 500)
   }
 
-  function addHandler(position: Position) {
-    const type = position === Position.Top || Position.Left ? 'target' : 'source'
-    console.log('addHandler', position, type)
-    setHandlers(handlers => {
-      const newHandler: HandleProps = {
-        id: `${id}-${position}-${handlers.length+1}`,
-        type,
-        position,
-        isConnectable: true
-      }
-      return [...handlers, newHandler]
-    })
-  }
-
   return (
     <>
-      <NodeToolbar position={Position.Top}>
+      {/* <NodeToolbar position={Position.Top}>
         <Button onClick={() => addHandler(Position.Top)}>Top</Button>
         <Button onClick={() => addHandler(Position.Left)}>Left</Button>
         <Button onClick={() => addHandler(Position.Right)}>Right</Button>
-      </NodeToolbar>
+      </NodeToolbar> */}
       <div
         style={{width: '100px', height: '50px'}} className='border-black rounded-md border-2'
         onMouseEnter={() => setToolbarVisible(true)}
         onMouseLeave={() => hideToolbarDelay()}
         >
         <p>{data.column}</p>
-        <p>{id}</p>
+        <p>{nodeId}</p>
         {
-          handlers.map(props => 
-            <Handle key={props.id} {...props} />
-          )
+          handlers.map(props => {
+            const initialSourceHandlerClass = props.isInitialHandler && props.type === 'source' ? 'source-handler' : ''
+            const initialTargetHandlerClass = props.isInitialHandler && props.type === 'target' ? 'target-handler' : ''
+            const isConnectableStart = props.type === 'source'
+            const isConnectableEnd = props.type === 'target'
+            return (
+              <Handle 
+                key={props.id} 
+                id={props.id}
+                type={props.type}
+                position={props.position}
+                data-id={props.id} 
+                isConnectableStart={isConnectableStart}
+                isConnectableEnd={isConnectableEnd}
+                className={`${initialSourceHandlerClass} ${initialTargetHandlerClass}`} />
+            )
+          })
         }
       </div>
     </>
   )
 }
-
-const GRID_NODE_TYPE_NAME = 'gridNode' as const
-type GRID_NODE = Node<GridNodeData, string | undefined>
 
 interface BackgroundGridProps {
   gridLine: GridLine
@@ -176,15 +300,17 @@ interface BackgroundGridProps {
   // offsetY: number
   viewBox: string
   currentCell: Cell | null
+  currentTargetCell: Cell | null
   containerWidth: number
   containerHeight: number
 }
 
 function BackgroundGrid(props: BackgroundGridProps) {
-  const {gridLine, viewBox, currentCell, containerHeight, containerWidth} = props
+  const {gridLine, viewBox, currentCell, currentTargetCell, containerHeight, containerWidth} = props
   const {minX, maxX, minY, maxY} = gridLine
   // console.log('viewBox', viewBox)
   const cellRect = currentCell?.rect
+  const targetCellRect = currentTargetCell?.rect
   return (
     <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
       <line x1='0' y1='-200' x2='0' y2='200'></line>
@@ -196,6 +322,14 @@ function BackgroundGrid(props: BackgroundGridProps) {
         x={cellRect.x} y={cellRect.y} 
         width={cellRect.width} height={cellRect.height}
         className="stroke-3 fill-red-500"
+        ></rect>
+    }
+    {
+      targetCellRect && 
+      <rect 
+        x={targetCellRect.x} y={targetCellRect.y} 
+        width={targetCellRect.width} height={targetCellRect.height}
+        className="stroke-3 fill-yellow-500"
         ></rect>
     }
     {
@@ -224,70 +358,48 @@ function Main() {
     [GRID_NODE_TYPE_NAME]: GridNode
   }), [])
 
-  const { fitView } = useReactFlow()
+  const {
+    nodes, setNode, addNode, setNodes, onNodesChange,
+    edges, onEdgesChange,
+    connectNodes,
+    reset,
+  } = useStore((state) => ({
+    nodes: state.nodes,
+    edges: state.edges,
+    setNodes: state.setNodes,
+    setNode: state.setNode,
+    addNode: state.addNode,
+    onNodesChange: state.onNodesChange,
+    onEdgesChange: state.onEdgesChange,
+    onConnect: state.onConnect,
+    connectNodes: state.connectNodes,
+    reset: state.reset,
+  }))
+
+  const updateNodeInternals = useUpdateNodeInternals()
+  const { fitView, screenToFlowPosition } = useReactFlow()
   const store = useStoreApi()
   const {width, height} = store.getState()
-  const [nodes, setNodes] = useNodesState<GridNodeData>([
-    {
-      id: '1',
-      data: { column: 1 },
-      position: { x: 0, y: 0 },
-      type: GRID_NODE_TYPE_NAME, 
-    },
-    {
-      id: '2',
-      data: { column: 2 },
-      position: { x: 100, y: 100 },
-      type: GRID_NODE_TYPE_NAME,
-    },
-  ]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([{ id: '1-2', source: '1', target: '2' }]);
   const { x, y, zoom } = useViewport()
   const layoutManager = useMemo(() => LayoutManager.defaultManager, [])
   const gridLine = useMemo(() => layoutManager.getGridLinesInViewPort({x: 0, y: 0, width: 100, height: 100}), [])
   const [currentCell, setCurrentCell] = useState<Cell|null>(null)
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    // console.log('onNodesChange', changes)
-    // for (const change of changes) {
-    //   if (change.type === 'position') {
-    //     const node = nodes.find(n => n.id === change.id)
-    //     if (node) {
-    //       const cell = layoutManager.findCellAt(change.position!)
-    //       if (cell) {
-    //         node.data.column = cell.column
-    //         setCurrentCell(cell)
-    //       }
-    //     }
-      
-    //   }
-    // }
-    setNodes((nds) => applyNodeChanges(changes, nds))
-  }, [nodes, setNodes])
-
-  // useEffect(() => {
-
-  //   console.log({x, y, zoom})
-  // }, [x, y, zoom])
+  const [currentTargetCell, setCurrentTargetCell] = useState<Cell|null>(null)
 
   useEffect(() => {
-    setTimeout(() => {
-      const positionNodes = layoutManager.layoutGridNodes(nodes)
-      setNodes(positionNodes)
-    }, 1000);
-    // window.requestAnimationFrame(() => {
-    //   fitView();
-    // });
-  }, [edges, setNodes, fitView])
+    addNode({
+      data: { column: 1, row: 1 },
+      position: {x: 0, y: 0},
+    })
+    return () => {
+      reset()
+    }
+  }, [])
 
   const onNodeDrag = useCallback((event: React.MouseEvent, node: Node, nodes: Node[]) => {
-    const position: XYPosition = {
-      x: (event.clientX - x) / zoom,
-      y: (event.clientY - y) / zoom
-    }
+    console.log('onNodeDrag')
+    const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
     const cell = layoutManager.findCellAt(position)
-    console.log(`onNodeDrag, event client xy: ${event.clientX},${event.clientY}`)
-    console.log(`onNodeDrag, event page xy: ${event.pageX},${event.pageY}`)
-    console.log(`onNodeDrag, event movement xy: ${event.movementX},${event.movementY}`)
     if (cell) {
       node.data.column = cell.column
       setCurrentCell(cell)
@@ -297,15 +409,65 @@ function Main() {
   const onNodeDragStop = useCallback((event: React.MouseEvent, currentNode: Node) => {
     if (currentCell !== null) {
       console.log('onNodeDragStop', currentNode.id, 'nodes', nodes)
-      setNodes(nodes => nodes.map(node => {
-        if (node.id === currentNode.id) {
-          node.position = currentCell.rect as XYPosition
-        }
-        return node
-      }))
+      setNode(currentNode.id, node => node.position = currentCell.rect as XYPosition)
     }
     setCurrentCell(null)
-  }, [currentCell, setNodes, nodes])
+  }, [currentCell, setNode, nodes])
+
+  const isConnectStartRef = useRef<OnConnectStartParams>()
+  const onConnectStart = useCallback((event: React.MouseEvent, params: OnConnectStartParams) => {
+    isConnectStartRef.current = {...params}
+    console.log('onConnectStart', event, params)
+  }, [])
+
+  const onConnectEnd = useCallback((event: MouseEvent) => {
+    console.log('onConnectEnd', event)
+
+    const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
+    const cell = layoutManager.findCellAt(position)
+    if (cell === null) return
+    const newNodeId = String(nodes.length + 1)
+    const newNodeDef: Node<GridNodeData> = {
+      id: newNodeId,
+      position: {x: cell.rect.x, y: cell.rect.y},
+      data: { column: 1, row: 1 },
+      type: GRID_NODE_TYPE_NAME,
+    }
+    addNode(newNodeDef)
+
+    const originalNodeId = isConnectStartRef.current!.nodeId!
+
+    connectNodes(originalNodeId, newNodeId)
+    updateNodeInternals([originalNodeId, newNodeId])
+    isConnectStartRef.current = undefined
+    setCurrentTargetCell(null)
+  }, [nodes, setNodes, store])
+
+  useEffect(() => {
+    document.addEventListener('mousemove', (event: MouseEvent) => {
+      // console.log('mousemove', event.clientX, event.clientY)
+      if (isConnectStartRef.current === undefined) return
+      const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
+      const cell = layoutManager.findCellAt(position)
+      if (cell) {
+        setCurrentTargetCell(cell)
+      }
+    })
+  }, [layoutManager, screenToFlowPosition])
+
+  useEffect(() => {
+    document.addEventListener('dblclick', (event: MouseEvent) => {
+      const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
+      const cell = layoutManager.findCellAt(position)
+      if (cell) {
+        addNode({
+          position: {x: cell.rect.x, y: cell.rect.y},
+          data: { column: cell.column, row: cell.row },
+          type: GRID_NODE_TYPE_NAME,
+        })
+      }
+    })
+  }, [addNode])
 
   return (
     <ReactFlow
@@ -316,16 +478,17 @@ function Main() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
+      onConnectStart={onConnectStart}
+      onConnectEnd={onConnectEnd}
+      zoomOnDoubleClick={false}
     >
-      <svg height={30} width={500} className='z-10 absolute'>
-        <text x={20} y={20}>{`coor: ${x.toFixed(3)},${y.toFixed(3)}. zoom: ${zoom.toFixed(2)}. width/height: ${width}/${height}`}</text>
-      </svg>
       <BackgroundGrid 
         containerHeight={height}
         containerWidth={width}
         gridLine={gridLine} 
         viewBox={`${-x/zoom} ${-y/zoom} ${width/zoom} ${height/zoom}`} 
-        currentCell={currentCell} />
+        currentCell={currentCell}
+        currentTargetCell={currentTargetCell} />
       <Controls />
     </ReactFlow>
   )
@@ -334,9 +497,12 @@ function Main() {
 function App() {
   return (
     <ReactFlowProvider>
-      <Main/>
+      <div className='h-screen w-screen'>
+        <Main/>
+      </div>
     </ReactFlowProvider>
   )
 }
 
 export default App
+

@@ -18,7 +18,8 @@
     "react-dom": "^18.2.0",
     "reactflow": "^11.10.4",
     "tailwind-merge": "^2.2.1",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^4.5.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
