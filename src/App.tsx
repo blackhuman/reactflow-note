@@ -121,7 +121,9 @@ type GridNodeData = {
   
 }
 
-type HandlePropsEx = HandleProps & {isInitialHandle: boolean}
+type HandlePropsEx = HandleProps & {
+  isInitialHandle: boolean,
+}
 
 type HandleMap = Record<string, HandlePropsEx[]>
 
@@ -253,11 +255,24 @@ function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<G
         <p>{data.column}</p>
         <p>{nodeId}</p>
         {
-          handles.map(props => {
+          handles.map((props, _, array) => {
             const initialSourceHandleClass = props.isInitialHandle && props.type === 'source' ? 'source-handle' : ''
             const initialTargetHandleClass = props.isInitialHandle && props.type === 'target' ? 'target-handle' : ''
             const isConnectableStart = props.type === 'source'
             const isConnectableEnd = props.type === 'target'
+            const style: React.CSSProperties = {}
+            if (!props.isInitialHandle) {
+              if (isConnectableStart) {
+                const filteredArray = array.filter(v => !v.isInitialHandle && v.isConnectableStart)
+                const index = filteredArray.findIndex(v => v.id === props.id)
+                style.top = 50 / (filteredArray.length + 1) * (index + 1)
+              } else {
+                const filteredArray = array.filter(v => !v.isInitialHandle && !v.isConnectableStart)
+                const index = filteredArray.findIndex(v => v.id === props.id)
+                style.top = 50 / (filteredArray.length + 1) * (index + 1)
+              }
+            }
+            
             return (
               <Handle 
                 key={props.id} 
@@ -267,6 +282,7 @@ function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<G
                 data-id={props.id} 
                 isConnectableStart={isConnectableStart}
                 isConnectableEnd={isConnectableEnd}
+                style={style}
                 className={`${initialSourceHandleClass} ${initialTargetHandleClass}`} />
             )
           })
@@ -379,7 +395,6 @@ function Main() {
   }, [])
 
   const onNodeDrag = useCallback((event: React.MouseEvent, node: Node, nodes: Node[]) => {
-    console.log('onNodeDrag')
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
     const cell = layoutManager.findCellAt(position)
     if (cell) {
@@ -390,7 +405,6 @@ function Main() {
 
   const onNodeDragStop = useCallback((event: React.MouseEvent, currentNode: Node) => {
     if (currentCell !== null) {
-      console.log('onNodeDragStop', currentNode.id, 'nodes', nodes)
       setNode(currentNode.id, node => node.position = currentCell.rect as XYPosition)
     }
     setCurrentCell(null)
