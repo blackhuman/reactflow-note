@@ -1,4 +1,4 @@
-div.source-handler {
+div.source-handle {
   width: 10px;
   height: 10px;
   position: absolute;
@@ -9,7 +9,7 @@ div.source-handler {
   opacity: 1;
 }
 
-div.target-handler {
+div.target-handler{
   width: 100%;
   height: 100%;
   /* background: blue; */

@@ -121,10 +121,9 @@ type GridNodeData = {
   
 }
 
-// const handlerMap: Map<string, HandleProps[]> = new Map()
-type HandlerProps = HandleProps & {isInitialHandler: boolean}
+type HandlePropsEx = HandleProps & {isInitialHandle: boolean}
 
-type HandlerMap = Record<string, HandlerProps[]>
+type HandleMap = Record<string, HandlePropsEx[]>
 
 type AppStore = {
   nodes: Node[];
@@ -137,9 +136,9 @@ type AppStore = {
   setNode: (nodeId: string, c: (node: Node) => void) => void
   addNode: (node: Omit<Node, 'id'>) => void
   getNode: (nodeId: string) => Node | null
-  handlerMap: HandlerMap
-  getHandlers(nodeId: string): HandlerProps[]
-  addHandler(nodeId: string, type: 'source' | 'target', isInitialHandler: boolean): string
+  handleMap: HandleMap
+  getHandles(nodeId: string): HandlePropsEx[]
+  addHandle(nodeId: string, type: 'source' | 'target', isInitialHandle: boolean): string
   connectNodes(sourceNodeId: string, targetNodeId: string): void
   reset(): void
 }
@@ -177,8 +176,8 @@ const useStore = create<AppStore>((set, get) => ({
       type: GRID_NODE_TYPE_NAME,
       id: String(get().nodes.length + 1)
     }
-    get().addHandler(newNode.id, 'source', true)
-    get().addHandler(newNode.id, 'target', true)
+    get().addHandle(newNode.id, 'source', true)
+    get().addHandle(newNode.id, 'target', true)
     set({ nodes: [...get().nodes, newNode] });
   },
   getNode: (nodeId: string) => {
@@ -187,70 +186,53 @@ const useStore = create<AppStore>((set, get) => ({
   setEdges: (edges: Edge[]) => {
     set({ edges });
   },
-  handlerMap: {},
-  getHandlers(nodeId) {
-    return get().handlerMap[nodeId] ?? []
+  handleMap: {},
+  getHandles(nodeId) {
+    return get().handleMap[nodeId] ?? []
   },
-  addHandler: (nodeId, type, isInitialHandler): string => {
-    let handlerId = ''
-    set((state) => {
-      const handlers = state.handlerMap[nodeId] ?? []
-      // console.log('handler', nodeId, type, isInitialHandler)
-      // const hasInitSource = handlers.filter(h => h.type === 'source' && h.isInitialHandler == true).length > 0
-      // const hasInitTarget = handlers.filter(h => h.type === 'target' && h.isInitialHandler == true).length > 0
-      // console.log(`hasInitSource: ${hasInitSource}, hasInitTarget: ${hasInitTarget}`)
-      // if (hasInitSource && hasInitTarget) return state
-
-      handlerId = `${type}_${handlers.length+1}_${isInitialHandler}`
-      // console.log('handlerId', handlerId)
-      const newHandler: HandlerProps = {
-        id: handlerId,
+  addHandle: (nodeId, type, isInitialHandle): string => {
+    let handleId = ''
+    set((state): Pick<AppStore, 'handleMap'> => {
+      const handles = state.handleMap[nodeId] ?? []
+      handleId = `${type}_${handles.length+1}_${isInitialHandle}`
+      const newHandle: HandlePropsEx = {
+        id: handleId,
         type,
         position: type === 'source' ? Position.Right : Position.Left,
         isConnectable: true,
         isConnectableStart: type==='source',
         isConnectableEnd: type==='target',
-        isInitialHandler,
+        isInitialHandle: isInitialHandle,
       }
-      const m = {handlerMap: {...state.handlerMap, [nodeId]: [...handlers, newHandler]}}
-      // console.log('m', m)
-      return m
+      return {handleMap: {...state.handleMap, [nodeId]: [...handles, newHandle]}}
     })
-    return handlerId
+    return handleId
   },
   connectNodes: (sourceNodeId: string, targetNodeId: string) => {
-    const addHandler = get().addHandler
-    const sourceHandlerId = addHandler(sourceNodeId, 'source', false)
-    const targetHandlerId = addHandler(targetNodeId, 'target', false)
+    const addHandle = get().addHandle
+    const sourceHandleId = addHandle(sourceNodeId, 'source', false)
+    const targetHandleId = addHandle(targetNodeId, 'target', false)
     const edge: Edge = {
-      id: `${sourceNodeId}_${sourceHandlerId}:${targetNodeId}_${targetHandlerId}`,
+      id: `${sourceNodeId}_${sourceHandleId}:${targetNodeId}_${targetHandleId}`,
       source: sourceNodeId,
-      sourceHandle: sourceHandlerId,
+      sourceHandle: sourceHandleId,
       target: targetNodeId,
-      targetHandle: targetHandlerId,
+      targetHandle: targetHandleId,
     }
     console.log('connectNodes', edge)
-    console.log('all handles', get().handlerMap)
+    console.log('all handles', get().handleMap)
     get().setEdges([...get().edges, edge])
   },
   reset() {
     get().setNodes([])
     get().setEdges([])
-    get().handlerMap = {}
+    get().handleMap = {}
   },
 }))
 
 function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<GridNodeData>) {
   const [toolbarVisible, setToolbarVisible] = useState(false)
-  const handlers = useStore(state => state.getHandlers(nodeId))
-  // const updateNodeInternals = useUpdateNodeInternals()
-  // const addHandler = useStore(state => state.addHandler)
-
-  // useEffect(() => {
-  //   console.log(`GridNode init, nodeId: ${nodeId}`)
-  //   addHandler(nodeId, 'source', true)
-  //   addHandler(nodeId, 'target', true)
-  // }, [])
+  const handles = useStore(state => state.getHandles(nodeId))
 
   function hideToolbarDelay() {
     setTimeout(() => setToolbarVisible(false), 500)
@@ -271,9 +253,9 @@ function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<G
         <p>{data.column}</p>
         <p>{nodeId}</p>
         {
-          handlers.map(props => {
-            const initialSourceHandlerClass = props.isInitialHandler && props.type === 'source' ? 'source-handler' : ''
-            const initialTargetHandlerClass = props.isInitialHandler && props.type === 'target' ? 'target-handler' : ''
+          handles.map(props => {
+            const initialSourceHandleClass = props.isInitialHandle && props.type === 'source' ? 'source-handle' : ''
+            const initialTargetHandleClass = props.isInitialHandle && props.type === 'target' ? 'target-handle' : ''
             const isConnectableStart = props.type === 'source'
             const isConnectableEnd = props.type === 'target'
             return (
@@ -285,7 +267,7 @@ function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<G
                 data-id={props.id} 
                 isConnectableStart={isConnectableStart}
                 isConnectableEnd={isConnectableEnd}
-                className={`${initialSourceHandlerClass} ${initialTargetHandlerClass}`} />
+                className={`${initialSourceHandleClass} ${initialTargetHandleClass}`} />
             )
           })
         }
