@@ -78,6 +78,20 @@ function useReactFlowEx(): ReactFlowInstanceEx {
       position: cell.rect,
       data: cell,
     })
+    const leftNodeId = layoutManager.findAdjacentNode(cell, 'left')?.nodeId ?? null
+    if (leftNodeId) {
+      addEdge(
+        {nodeId: leftNodeId, type: 'source'},
+        {nodeId, type: 'target'}
+      )
+    }
+    const rightNodeId = layoutManager.findAdjacentNode(cell, 'right')?.nodeId ?? null
+    if (rightNodeId) {
+      addEdge(
+        {nodeId, type: 'source'},
+        {nodeId: rightNodeId, type: 'target'}
+      )
+    }
     return nodeId
   }
   const updateNode: ReactFlowInstanceEx['updateNode'] = (nodeId, modify) => {
@@ -251,6 +265,7 @@ function Main() {
   const layoutManager = useStoreLocal(state => state.layoutManager)
   const [currentCell, setCurrentCell] = useState<Cell|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
+  const setConnecting = useStoreLocal(state => state.setConnecting)
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
@@ -279,7 +294,8 @@ function Main() {
 
   const onConnectStart: OnConnectStart = useCallback((_, params) => {
     connectStartRef.current = {...params}
-  }, [])
+    setConnecting(true)
+  }, [setConnecting])
 
   const onPaneMouseMove: React.MouseEventHandler = useCallback((event) => {
     if (connectStartRef.current === undefined) return
@@ -296,6 +312,7 @@ function Main() {
     const source = connectStartRef.current!.nodeId!
     connectStartRef.current = undefined
     setCurrentCell(null)
+    setConnecting(false)
 
     // for create in empty cell
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})

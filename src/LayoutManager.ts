@@ -31,12 +31,9 @@ type GridIndex = {
 
 class LayoutManager {
 
-  // nodes: GRID_NODE[] = []
   rows: Map<number, Row> = new Map()
   columns: Map<number, Column> = new Map()
-  nodes: Map<string, Cell> = new Map()
-
-  // static defaultManager = new LayoutManager()
+  nodes: Map<number, Map<number, Cell>> = new Map()
 
   constructor() {
     const initLength = 100
@@ -52,26 +49,22 @@ class LayoutManager {
         origin: index * initLength,
         length: initLength,
       })
+      this.nodes.set(index, new Map())
     }
     console.log('rows', this.rows)
     console.log('columns', this.columns)
   }
 
-  private getNodeKey(index: GridIndex): string {
-    return `${index.row},${index.column}`
-  }
-
   addNode(cell: Cell) {
-    const key = this.getNodeKey(cell)
-    this.nodes.set(key, cell)
+    this.nodes.get(cell.row)?.set(cell.column, cell)
   }
 
   hasNode(index: GridIndex): boolean {
-    return this.nodes.has(this.getNodeKey(index))
+    return this.getNode(index.row, index.column) !== null
   }
 
-  getNode(row: number, column: number): Cell | null {
-    return this.nodes.get(this.getNodeKey({row, column})) ?? null
+  getNode(rowIndex: number, columnIndex: number): Cell | null {
+    return this.nodes.get(rowIndex)?.get(columnIndex) ?? null
   }
 
   findCellAt(position: XYPosition): Cell | null {
@@ -113,9 +106,18 @@ class LayoutManager {
     return result
   }
 
-  // getLeftNodeCell(cell: Cell): Cell | null {
-    
-  // }
+  findAdjacentNode(cell: Cell, adjacent: 'left' | 'right'): Cell | null {
+    const row = this.nodes.get(cell.row)
+    if (!row) return null;
+    const columns = [...row.keys()]
+    if (columns.length < 2) return null
+    const findedIndex = columns.sort((a, b) => adjacent === 'left' ? a - b : b - a)
+      .findIndex(v => v === cell.column)
+    if (findedIndex === -1 || findedIndex - 1 < 0) return null;
+    const conlumnIndex = columns[findedIndex - 1]
+    return row.get(conlumnIndex) ?? null
+  }
+
 }
 
 export {
