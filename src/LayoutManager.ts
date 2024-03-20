@@ -59,6 +59,15 @@ class LayoutManager {
     this.nodes.get(cell.row)?.set(cell.column, cell)
   }
 
+  updateNode(index: GridIndex, cell: Cell) {
+    this.nodes.get(index.row)?.delete(index.column)
+    this.addNode(cell)
+  }
+
+  deleteNode(cell: Cell) {
+    this.nodes.get(cell.row)?.delete(cell.column)
+  }
+
   hasNode(index: GridIndex): boolean {
     return this.getNode(index.row, index.column) !== null
   }

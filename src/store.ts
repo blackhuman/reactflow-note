@@ -22,6 +22,7 @@ type AppStore = {
   clearHandle(): void
   getHandles(nodeId: string): HandleProps[]
   addHandle(handle: ConnectingHandle): string
+  deleteHandle(handle: ConnectingHandle): void
   layoutManager: LayoutManager
 }
 
@@ -30,8 +31,7 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
     layoutManager: new LayoutManager(),
     isConnecting: false,
     setConnecting(isConnecting) {
-      set(() => ({isConnecting}))
-      console.log('isConnectings', get().isConnecting)
+      set({isConnecting})
     },
     handleMap: {},
     clearHandle() {
@@ -58,6 +58,13 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
         return {handleMap: {...state.handleMap, [handle.nodeId]: [...handles, newHandle]}}
       })
       return handle.handleId!
+    },
+    deleteHandle(handle) {
+      set((state): Pick<AppStore, 'handleMap'> => {
+        const handles = state.handleMap[handle.nodeId] ?? []
+        const newHandles = handles.filter(h => h.id !== handle.handleId)
+        return {handleMap: {...state.handleMap, [handle.nodeId]: newHandles}}
+      })
     },
   }
 }
