@@ -1,164 +1,18 @@
 // import { useState } from 'react'
-import { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
 import './App.css'
-import ReactFlow, { Controls, Handle, NodeToolbar, Panel, Position, ReactFlowProvider, applyEdgeChanges, applyNodeChanges, useReactFlow, useStore as useStoreReactFlow, useStoreApi, useUpdateNodeInternals, useViewport, useNodesState, useEdgesState } from 'reactflow';
-import type {ConnectingHandle, Connection, Dimensions, Edge, EdgeChange, HandleProps, Node, NodeChange, NodeDragHandler, NodeProps, NodeTypes, OnConnect, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesChange, OnNodesChange, ReactFlowInstance, Rect, XYPosition} from 'reactflow'
+import ReactFlow, { Controls, Handle, Panel, Position, ReactFlowProvider, useReactFlow, useStoreApi, useUpdateNodeInternals, useViewport, useNodesState, useEdgesState } from 'reactflow';
+import type {ConnectingHandle, Connection, Edge, Node, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, ReactFlowInstance, XYPosition} from 'reactflow'
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import {StateCreator, create} from 'zustand'
-import { UpdateIcon } from '@radix-ui/react-icons';
-
-interface GridLine {
-  xList: number[]
-  yList: number[]
-  minX: number
-  maxX: number
-  minY: number
-  maxY: number
-}
-
-interface Cell {
-  rect: Rect
-  row: number
-  column: number
-  nodeId?: string
-}
+import { useStoreLocal } from './store';
+import { Cell, GridLine } from './LayoutManager';
 
 const GRID_NODE_TYPE_NAME = 'gridNode' as const
-type GRID_NODE = Node<GridNodeData, string | undefined>
 
-function zoomCell(cell: Cell | null, zoom: number): Cell | null {
-  if (cell === null) return null
-  return {
-    ...cell,
-    rect: {
-      x: cell.rect.x * zoom,
-      y: cell.rect.y * zoom,
-      width: cell.rect.width * zoom,
-      height: cell.rect.height * zoom
-    }
-  }
-}
+type GridNodeData = Cell
 
-type Row = {
-  index: number
-  origin: number
-  length: number
-}
-
-type Column = Row
-
-class LayoutManager {
-
-  // nodes: GRID_NODE[] = []
-  cells: Cell[][] = []
-  rows: Row[] = []
-  columns: Column[] = []
-
-  static defaultManager = new LayoutManager()
-
-  constructor() {
-    const initLength = 100
-    const initCount = 10
-    for (let naturalIndex = 0, index = -initCount; index < initCount; naturalIndex++, index++) {
-      this.rows[naturalIndex] = {
-        index,
-        origin: index * initLength,
-        length: initLength,
-      }
-      this.columns[naturalIndex] = {
-        index,
-        origin: index * initLength,
-        length: initLength,
-      }
-    }
-    console.log('rows', this.rows)
-    console.log('columns', this.columns)
-  }
-
-  // getFirstCell(): Cell | null {
-  //   return this.cells[0]
-  // }
-
-  // layoutGridNodes(nodes: GRID_NODE[]): GRID_NODE[] {
-  //   this.nodes = nodes
-  //   nodes.forEach(node => {
-  //     node.position = { x: node.data.column * 100, y: 100 }
-  //   })
-  //   return this.nodes
-  // }
-  
-  // addNodeToCell(node: GRID_NODE): GRID_NODE[] {
-  //   this.nodes.push(node)
-  //   for (const cell of this.cells) {
-  //     if (cell.column === node.data.column && cell.row === node.data.row) {
-  //       cell.nodeId = node.id
-  //       break
-  //     }
-  //   }
-
-  //   return this.nodes
-  // }
-
-  findCellAt(position: XYPosition): Cell | null {
-    let row: Row | null = null
-    for (const item of this.rows) {
-      if (position.y < item.origin) break
-      row = item
-    }
-    let column: Column | null = null
-    for (const item of this.columns) {
-      if (position.x < item.origin) break
-      column = item
-    }
-    if (row === null || column === null) return null
-    return {
-      rect: {x: column.origin, y: row.origin, width: column.length, height: row.length},
-      row: row.index,
-      column: column.index
-    }
-  }
-
-  // rect 限定区域
-  getGridLinesInViewPort(rect: Rect): GridLine {
-    console.time("getGridLinesInViewPort")
-    const xList = this.columns.map(v => v.origin)
-    const yList = this.rows.map(v => v.origin)
-    const result: GridLine = {
-      xList,
-      yList,
-      minX: xList[0],
-      maxX: xList[xList.length - 1],
-      minY: yList[0],
-      maxY: yList[yList.length - 1],
-    }
-    console.timeEnd("getGridLinesInViewPort")
-    return result
-  }
-
-  // getLeftNodeCell(cell: Cell): Cell | null {
-    
-  // }
-}
-
-type GridNodeData = {
-  row: number
-  column: number
-  
-}
-
-type HandleMap = Record<string, HandleProps[]>
-
-type AppStore = {
-  isConnecting: boolean
-  setConnecting(isConnecting: boolean): void
-  handleMap: HandleMap
-  clearHandle(): void
-  getHandles(nodeId: string): HandleProps[]
-  addHandle(handle: ConnectingHandle): string
-}
-
-const useNodesStateEx: typeof useNodesState = (initialItems) => {
+const useNodesStateEx: typeof useNodesState<GridNodeData> = (initialItems) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialItems)
   const updateNodeInternals = useUpdateNodeInternals()
   return [
@@ -200,31 +54,29 @@ const useEdgesStateEx: typeof useEdgesState = (initialItems) => {
   ]
 }
 
-type NodeType = {
-  cell: Cell
-  data: GridNodeData
-}
-
 type ReactFlowInstanceEx = ReactFlowInstance & {
-  addNode(node: NodeType): string
+  addNode(position: XYPosition): string
   updateNode(nodeId: string, modify: (node: Node) => void): void
   addEdge(source: ConnectingHandle, target: ConnectingHandle): void
 }
 
 function useReactFlowEx(): ReactFlowInstanceEx {
-  const reactFlowInstance = useReactFlow()
-  const {getNodes, addNodes, getNode, setNodes, setEdges, getEdges} = reactFlowInstance
+  const reactFlowInstance = useReactFlow<GridNodeData>()//
+  const {getNodes, addNodes, setNodes} = reactFlowInstance
   const addHandle = useStoreLocal(state => state.addHandle)
   const updateNodeInternals = useUpdateNodeInternals()
   const {addEdges} = useReactFlow()
-  const addNode: ReactFlowInstanceEx['addNode'] = ({cell, data}) => {
-    LayoutManager.defaultManager
+  const layoutManager = useStoreLocal(state => state.layoutManager)
+  const addNode: ReactFlowInstanceEx['addNode'] = (position) => {
+    const cell = layoutManager.findCellAt(position)!
     const nodeId = `${getNodes().length + 1}`
+    cell.nodeId = nodeId
+    layoutManager.addNode(cell)
     addNodes({
       id: nodeId,
       type: GRID_NODE_TYPE_NAME,
       position: cell.rect,
-      data,
+      data: cell,
     })
     return nodeId
   }
@@ -269,61 +121,8 @@ function useOperationReset(): () => void {
   }
 }
 
-interface ReactflowActionStore {
-
-}
-
-const reactflowActionStore: StateCreator<ReactflowActionStore, [], [], ReactflowActionStore> = (set, get) => {
-  return {
-
-  }
-}
-
-const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
-  return {
-    isConnecting: false,
-    setConnecting(isConnecting) {
-      set(() => ({isConnecting}))
-      console.log('isConnectings', get().isConnecting)
-    },
-    handleMap: {},
-    clearHandle() {
-      set({handleMap: {}})
-    },
-    getHandles(nodeId) {
-      return get().handleMap[nodeId] ?? []
-    },
-    addHandle: (handle): string => {
-      const handles = get().handleMap[handle.nodeId] ?? []
-      const type = handle.type
-      if (handle.handleId === undefined) {
-        handle.handleId = `${type}_${handles.length+1}`
-      }
-      set((state): Pick<AppStore, 'handleMap'> => {
-        const newHandle: HandleProps = {
-          id: handle.handleId!,
-          type,
-          position: type === 'source' ? Position.Right : Position.Left,
-          isConnectable: true,
-          isConnectableStart: type==='source',
-          isConnectableEnd: type==='target',
-        }
-        return {handleMap: {...state.handleMap, [handle.nodeId]: [...handles, newHandle]}}
-      })
-      return handle.handleId!
-    },
-  }
-}
-
-const useStoreLocal = create<AppStore & ReactflowActionStore>((...a) => {
-  return {
-    ...baseStore(...a),
-    ...reactflowActionStore(...a),
-  }
-})
-
-function GridNode({sourcePosition, isConnectable, data, id: nodeId}: NodeProps<GridNodeData>) {
-  const [toolbarVisible, setToolbarVisible] = useState(false)
+function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
+  const [, setToolbarVisible] = useState(false)
   const handles = useStoreLocal(state => state.getHandles(nodeId))
   const isConnecting = useStoreLocal(state => state.isConnecting)
 
@@ -448,22 +247,16 @@ function BackgroundGrid(props: BackgroundGridProps) {
 
 function Main() {
 
-  const { fitView, screenToFlowPosition, toObject, addNode, updateNode, addEdge } = useReactFlowEx()
-  const layoutManager = useMemo(() => LayoutManager.defaultManager, [])
+  const { screenToFlowPosition, addNode, updateNode, addEdge } = useReactFlowEx()
+  const layoutManager = useStoreLocal(state => state.layoutManager)
   const [currentCell, setCurrentCell] = useState<Cell|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
-      const cell = layoutManager.findCellAt(position)
-      if (cell) {
-        console.log('dblclick add Node', cell)
-        addNode({
-          cell,
-          data: { column: cell.column, row: cell.row },
-        })
-      }
-  }, [addNode, layoutManager, screenToFlowPosition])
+    console.log('dblclick add Node', position)
+    addNode(position)
+  }, [addNode, screenToFlowPosition])
 
   const onNodeDragStart: NodeDragHandler = useCallback(() => {
     // setConnecting(true)
@@ -477,14 +270,14 @@ function Main() {
     }
   }, [layoutManager, screenToFlowPosition])
 
-  const onNodeDragStop: NodeDragHandler = useCallback((event, currentNode) => {
+  const onNodeDragStop: NodeDragHandler = useCallback((_, currentNode) => {
     if (currentCell !== null) {
       updateNode(currentNode.id, node => node.position = currentCell.rect as XYPosition)
     }
     setCurrentCell(null)
   }, [currentCell, updateNode])
 
-  const onConnectStart: OnConnectStart = useCallback((event, params) => {
+  const onConnectStart: OnConnectStart = useCallback((_, params) => {
     connectStartRef.current = {...params}
   }, [])
 
@@ -500,21 +293,19 @@ function Main() {
   const onConnectEnd: OnConnectEnd = useCallback((event) => {
     if (event instanceof TouchEvent) return
 
-    const originNodeId = connectStartRef.current!.nodeId!
+    const source = connectStartRef.current!.nodeId!
     connectStartRef.current = undefined
+    setCurrentCell(null)
 
     // for create in empty cell
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
     const cell = layoutManager.findCellAt(position)
-    if (cell === null) return
-    const newNodeId = addNode({
-      cell,
-      data: { column: 1, row: 1 },
-    })
+    if (!cell || cell.nodeId) return
+    const target = addNode(cell.rect)
 
     addEdge(
-      { nodeId: originNodeId, type: 'source' }, 
-      { nodeId: newNodeId, type: 'target' }
+      { nodeId: source, type: 'source' }, 
+      { nodeId: target, type: 'target' }
     )
   }, [screenToFlowPosition, layoutManager, addNode, addEdge])
 
@@ -522,7 +313,10 @@ function Main() {
     const { source, target } = params
     if (source === null || target === null) return
 
-    addEdge({nodeId: source, type: 'source'}, {nodeId: target, type: 'target'})
+    addEdge(
+      {nodeId: source, type: 'source'}, 
+      {nodeId: target, type: 'target'}
+      )
   }, [addEdge])
 
   return (
@@ -555,8 +349,8 @@ function BackgroundGridComponent(props: BackgroundGridComponentProps) {
   const store = useStoreApi()
   const {width, height} = store.getState()
   const { x, y, zoom } = useViewport()
-  const layoutManager = useMemo(() => LayoutManager.defaultManager, [])
-  const gridLine = useMemo(() => layoutManager.getGridLinesInViewPort({x: 0, y: 0, width: 100, height: 100}), [])
+  const layoutManager = useStoreLocal(state => state.layoutManager)
+  const gridLine = useMemo(() => layoutManager.getGridLinesInViewPort({x: 0, y: 0, width: 100, height: 100}), [layoutManager])
   
   return (
 
@@ -577,19 +371,20 @@ function ReactFlowBase(props: ReactFlowProps) {
     [GRID_NODE_TYPE_NAME]: GridNode
   }), [])
 
-  const [nodes, setNodes, onNodesChange] = useNodesStateEx([{
-    id: '1',
-    data: { column: 1, row: 1 },
-    position: {x: 0, y: 0},
-    type: GRID_NODE_TYPE_NAME,
-  }])
+  const [nodes, setNodes, onNodesChange] = useNodesStateEx([])
   const [edges, setEdges, onEdgesChange] = useEdgesStateEx([])
   // const connectNodes = useOperationConnectNodes()
   const reset = useOperationReset()
-  const setConnecting = useStoreLocal(state => state.setConnecting)
-  const { fitView, screenToFlowPosition, toObject, addNode, updateNode, addEdge } = useReactFlowEx()
+  const { toObject, addNode } = useReactFlowEx()
+  const layoutManager = useStoreLocal(state => state.layoutManager)
 
-  const flowKey = 'reactflow'
+  const onInit = useCallback(() => {
+    console.log('onInit')
+    const cell = layoutManager.findCellAt({x: 0, y: 0})!
+    addNode(cell.rect)
+  }, [addNode, layoutManager])
+
+  const flowKey = 'reactflow'//23
 
   const onSave = useCallback(() => {
     const flow = toObject();
@@ -610,7 +405,7 @@ function ReactFlowBase(props: ReactFlowProps) {
     };
 
     restoreFlow();
-  }, [setNodes, setEdges]);
+  }, [reset, setNodes, setEdges]);
 
   return (
     <ReactFlow
@@ -621,6 +416,7 @@ function ReactFlowBase(props: ReactFlowProps) {
       onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
       zoomOnDoubleClick={false}
+      onInit={onInit}
     >
       <Controls />
       <Panel position="top-right">
