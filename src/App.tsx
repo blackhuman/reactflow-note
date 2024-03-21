@@ -1,12 +1,13 @@
 // import { useState } from 'react'
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
 import './App.css'
-import ReactFlow, { Controls, Handle, Panel, Position, ReactFlowProvider, useReactFlow, useStoreApi, useUpdateNodeInternals, useViewport, useNodesState, useEdgesState } from 'reactflow';
+import ReactFlow, { Controls, Handle, Panel, Position, useReactFlow, useStoreApi, useUpdateNodeInternals, useViewport, useNodesState, useEdgesState } from 'reactflow';
 import type {ConnectingHandle, Connection, Node, Edge, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnNodesDelete, ReactFlowInstance, XYPosition, OnEdgesDelete} from 'reactflow'
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useStoreLocal } from './store';
 import { Cell, GridLine } from './LayoutManager';
+import { Checkbox } from './components/ui/checkbox';
 
 const GRID_NODE_TYPE_NAME = 'gridNode' as const
 
@@ -264,8 +265,7 @@ interface BackgroundGridProps {
 
 function BackgroundGrid(props: BackgroundGridProps) {
   const {gridLine, viewBox, currentCell, containerHeight, containerWidth} = props
-  const {minX, maxX, minY, maxY} = gridLine
-  // console.log('viewBox', viewBox)
+  const {minX, maxX, minY, maxY, xList, yList, rects} = gridLine
   const cellRect = currentCell?.rect
   return (
     <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
@@ -280,33 +280,43 @@ function BackgroundGrid(props: BackgroundGridProps) {
         className="stroke-3 fill-red-500"
         ></rect>
     }
-    {
-      // draw vertical lines
-      gridLine.xList.map((x, i) => {
-        return (
-          <line key={`x${i}`} x1={x} y1={minY} x2={x} y2={maxY} className="stroke-1 stroke-black" />
-        )
-      })
-    }
-    {
-      // draw horizontal lines
-      gridLine.yList.map((y, i) => {
-        return (
-          <line key={`y${i}`} x1={minX} y1={y} x2={maxX} y2={y} className='stroke-1 stroke-black' />
-        )
-      })
-    }
+    <g>
+      {
+        // draw vertical lines
+        xList.map((x, i) => {
+          return (
+            <line key={`x${i}`} x1={x} y1={minY} x2={x} y2={maxY} className="grid-separator grid-separator-vertical" />
+          )
+        })
+      }
+      {
+        // draw horizontal lines
+        yList.map((y, i) => {
+          return (
+            <line key={`y${i}`} x1={minX} y1={y} x2={maxX} y2={y} className='grid-separator' />
+          )
+        })
+      }
+    </g>
+    <g>
+      {
+        rects.map((rect, i) => (
+          <rect key={`rect${i}`} style={rect} className='grid-rect'/>
+        ))
+      }
+    </g>
     </svg>
   )
 }
 
-function Main() {
+function App() {
 
   const { screenToFlowPosition, addNode, deleteNode, updateNode, addEdge, afterDeleteEdge } = useReactFlowEx()
   const layoutManager = useStoreLocal(state => state.layoutManager)
   const [currentCell, setCurrentCell] = useState<Cell|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
   const setConnecting = useStoreLocal(state => state.setConnecting)
+  const [showGrid, setShowGrid] = useState(true)
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
@@ -401,9 +411,12 @@ function Main() {
       onDoubleClick={onDoubleClick}
       onPaneMouseMove={onPaneMouseMove}
     >
-      <BackgroundGridComponent
+      { showGrid && <BackgroundGridComponent
         currentCell={currentCell}
-        />
+        />}
+      <Controls>
+        <Checkbox checked={showGrid} onCheckedChange={checked => setShowGrid(checked === true)}/>
+      </Controls>
     </ReactFlowBase>
   )
 }
@@ -486,23 +499,12 @@ function ReactFlowBase(props: ReactFlowProps) {
       zoomOnDoubleClick={false}
       onInit={onInit}
     >
-      <Controls />
       <Panel position="top-right">
         <Button onClick={onSave}>save</Button>
         <Button onClick={onRestore}>restore</Button>
       </Panel>
       {props?.children}
     </ReactFlow>
-  )
-}
-
-function App() {
-  return (
-    <div className='h-screen w-screen'>
-      <ReactFlowProvider>
-        <Main/>
-      </ReactFlowProvider>
-    </div>
   )
 }
 

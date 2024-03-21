@@ -3,6 +3,7 @@ import { Rect, XYPosition } from "reactflow"
 interface GridLine {
   xList: number[]
   yList: number[]
+  rects: Rect[]
   minX: number
   maxX: number
   minY: number
@@ -38,15 +39,16 @@ class LayoutManager {
   constructor() {
     const initLength = 100
     const initCount = 10
+    const gap = 10
     for (let index = -initCount; index < initCount; index++) {
       this.rows.set(index, {
         index,
-        origin: index * initLength,
+        origin: index * (initLength + gap),
         length: initLength,
       })
       this.columns.set(index, {
         index,
-        origin: index * initLength,
+        origin: index * (initLength + gap),
         length: initLength,
       })
       this.nodes.set(index, new Map())
@@ -101,16 +103,25 @@ class LayoutManager {
   getGridLinesInViewPort(rect: Rect): GridLine {
     console.log('getGridLinesInViewPort', rect)
     console.time("getGridLinesInViewPort")
-    const xList = [...this.columns.values()].map(v => v.origin)
-    const yList = [...this.rows.values()].map(v => v.origin)
+    const xList = [...this.columns.values()].flatMap(v => [v.origin, v.origin + v.length])
+    const yList = [...this.rows.values()].flatMap(v => [v.origin, v.origin + v.length])
+    const rects: Rect[] = []
+    for (const row of this.rows.values()) {
+      for (const column of this.columns.values()) {
+        rects.push({x: column.origin, y: row.origin, width: column.length, height: row.length})
+      }
+    }
+    // const rectangles = 
     const result: GridLine = {
       xList,
       yList,
+      rects,
       minX: xList[0],
       maxX: xList[xList.length - 1],
       minY: yList[0],
       maxY: yList[yList.length - 1],
     }
+    console.log('rects', rects)
     console.timeEnd("getGridLinesInViewPort")
     return result
   }

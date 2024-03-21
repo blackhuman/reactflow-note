@@ -1,3 +1,5 @@
+@tailwind utilities;
+
 div.source-handle {
   width: 10px;
   height: 10px;
@@ -20,4 +22,26 @@ div.target-handle {
   transform: none;
   border: none;
   opacity: 0;
+}
+
+.grid-separator {
+  stroke-width: 1;
+  @apply stroke-black;
+  stroke-linecap: round;
+  stroke-dasharray: 1, 2;
+}
+
+.grid-separator-horizontal {
+
+}
+
+.grid-separator-vertical {
+  stroke-opacity: 0.1;
+}
+
+.grid-rect {
+  stroke-opacity: 0.1;
+  stroke-width: 1;
+  @apply stroke-black;
+  @apply fill-none;
 }
