@@ -62,12 +62,13 @@ type ReactFlowInstanceEx = ReactFlowInstance & {
   deleteNode(node: Node<GridNodeData>): void
   updateNode(nodeId: string, originData: GridNodeData, targetData: GridNodeData): void
   addEdge(source: ConnectingHandle, target: ConnectingHandle): void
+  afterDeleteEdge(edge: Edge): void
   deleteEdge(edge: Edge): void
 }
 
 function useReactFlowEx(): ReactFlowInstanceEx {
   const reactFlowInstance = useReactFlow<GridNodeData>()//
-  const {getNodes, addNodes, setNodes} = reactFlowInstance
+  const {getNodes, addNodes, setNodes, getEdges, setEdges} = reactFlowInstance
   const [addHandle, deleteHandle] = useStoreLocal(state => [state.addHandle, state.deleteHandle])
   const updateNodeInternals = useUpdateNodeInternals()
   const {addEdges} = useReactFlow()
@@ -83,14 +84,31 @@ function useReactFlowEx(): ReactFlowInstanceEx {
       position: cell.rect,
       data: cell,
     })
+
     const leftNodeId = layoutManager.findAdjacentNode(cell, 'left')?.nodeId ?? null
+    const rightNodeId = layoutManager.findAdjacentNode(cell, 'right')?.nodeId ?? null
+
+    if (leftNodeId && rightNodeId) {
+      let existEdge: Edge | undefined
+      for (const edge of getEdges()) {
+        if (edge.source === leftNodeId && edge.target === rightNodeId) {
+          existEdge = edge
+          break
+        }
+      }
+      if (existEdge) {
+        console.log('deleteEdge', existEdge)
+        deleteEdge(existEdge)
+        afterDeleteEdge(existEdge)
+      }
+    }
+
     if (leftNodeId) {
       addEdge(
         {nodeId: leftNodeId, type: 'source'},
         {nodeId, type: 'target'}
       )
     }
-    const rightNodeId = layoutManager.findAdjacentNode(cell, 'right')?.nodeId ?? null
     if (rightNodeId) {
       addEdge(
         {nodeId, type: 'source'},
@@ -129,10 +147,13 @@ function useReactFlowEx(): ReactFlowInstanceEx {
     }
     addEdges(edge)
   }
-  const deleteEdge: ReactFlowInstanceEx['deleteEdge'] = (edge) => {
+  const afterDeleteEdge: ReactFlowInstanceEx['afterDeleteEdge'] = (edge) => {
     deleteHandle({nodeId: edge.source, handleId: edge.sourceHandle, type: 'source'})
     deleteHandle({nodeId: edge.target, handleId: edge.targetHandle, type: 'target'})
     updateNodeInternals([edge.source, edge.target])
+  }
+  const deleteEdge: ReactFlowInstanceEx['deleteEdge'] = (edge) => {
+    setEdges(edges => edges.filter(e => e.id !== edge.id))
   }
   return {
     ...reactFlowInstance,
@@ -140,6 +161,7 @@ function useReactFlowEx(): ReactFlowInstanceEx {
     deleteNode,
     updateNode,
     addEdge,
+    afterDeleteEdge,
     deleteEdge,
   }
 }
@@ -280,7 +302,7 @@ function BackgroundGrid(props: BackgroundGridProps) {
 
 function Main() {
 
-  const { screenToFlowPosition, addNode, deleteNode, updateNode, addEdge, deleteEdge } = useReactFlowEx()
+  const { screenToFlowPosition, addNode, deleteNode, updateNode, addEdge, afterDeleteEdge } = useReactFlowEx()
   const layoutManager = useStoreLocal(state => state.layoutManager)
   const [currentCell, setCurrentCell] = useState<Cell|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
@@ -360,7 +382,7 @@ function Main() {
   }
 
   const onEdgesDelete: OnEdgesDelete = (edges) => {
-    edges.forEach(deleteEdge)
+    edges.forEach(afterDeleteEdge)
   }
 
   return (
