@@ -6,7 +6,7 @@ import type {ConnectingHandle, Connection, Node, Edge, NodeDragHandler, NodeProp
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { useStoreLocal } from './store';
-import { Cell, GridLine } from './LayoutManager';
+import { Cell, Gap, GridLine } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
 
 const GRID_NODE_TYPE_NAME = 'gridNode' as const
@@ -60,6 +60,7 @@ const useEdgesStateEx: typeof useEdgesState = (initialItems) => {
 
 type ReactFlowInstanceEx = ReactFlowInstance & {
   addNode(position: XYPosition): string
+  insertNode(cell: Cell): void
   deleteNode(node: Node<GridNodeData>): void
   updateNode(nodeId: string, originData: GridNodeData, targetData: GridNodeData): void
   addEdge(source: ConnectingHandle, target: ConnectingHandle): void
@@ -119,6 +120,19 @@ function useReactFlowEx(): ReactFlowInstanceEx {
     console.log('addNode', leftNodeId, rightNodeId)
     return nodeId
   }
+  const insertNode: ReactFlowInstanceEx['insertNode'] = (cell) => {
+    const targetNodes = layoutManager.moveAllNodeToRight(cell)
+    console.log('insertNode', targetNodes)
+    setNodes(nodes => nodes.map(node => {
+      const targetNode = targetNodes.find(n => n.nodeId === node.id)
+      if (targetNode) {
+        node.position = targetNode.rect
+        node.data = targetNode
+      }
+      return node
+    }))
+    addNode(cell.rect)
+  }
   const deleteNode: ReactFlowInstanceEx['deleteNode'] = (node) => {
     layoutManager.deleteNode(node.data)
   }
@@ -164,6 +178,7 @@ function useReactFlowEx(): ReactFlowInstanceEx {
     addEdge,
     afterDeleteEdge,
     deleteEdge,
+    insertNode,
   }
 }
 
@@ -265,7 +280,7 @@ interface BackgroundGridProps {
 
 function BackgroundGrid(props: BackgroundGridProps) {
   const {gridLine, viewBox, currentCell, containerHeight, containerWidth} = props
-  const {minX, maxX, minY, maxY, xList, yList, rects} = gridLine
+  const {minX, maxX, minY, maxY, xList, yList} = gridLine
   const cellRect = currentCell?.rect
   return (
     <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
@@ -298,29 +313,22 @@ function BackgroundGrid(props: BackgroundGridProps) {
         })
       }
     </g>
-    <g>
-      {
-        rects.map((rect, i) => (
-          <rect key={`rect${i}`} style={rect} className='grid-rect'/>
-        ))
-      }
-    </g>
     </svg>
   )
 }
 
 function App() {
 
-  const { screenToFlowPosition, addNode, deleteNode, updateNode, addEdge, afterDeleteEdge } = useReactFlowEx()
+  const { screenToFlowPosition, addNode, deleteNode, updateNode, addEdge, afterDeleteEdge, insertNode } = useReactFlowEx()
   const layoutManager = useStoreLocal(state => state.layoutManager)
   const [currentCell, setCurrentCell] = useState<Cell|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
   const setConnecting = useStoreLocal(state => state.setConnecting)
   const [showGrid, setShowGrid] = useState(true)
+  const [gap, setGap] = useState<Gap | null>(null)
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
-    console.log('dblclick add Node', position)
     addNode(position)
   }, [addNode, screenToFlowPosition])
 
@@ -349,8 +357,12 @@ function App() {
   }, [setConnecting])
 
   const onPaneMouseMove: React.MouseEventHandler = useCallback((event) => {
-    if (connectStartRef.current === undefined) return
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
+
+    const gap = layoutManager.findGapAt(position)
+    setGap(gap)
+
+    if (connectStartRef.current === undefined) return
     const cell = layoutManager.findCellAt(position)
     if (cell) {
       setCurrentCell(cell)
@@ -395,6 +407,14 @@ function App() {
     edges.forEach(afterDeleteEdge)
   }
 
+  const onClickInsertNode = useCallback(() => {
+    if (gap) {
+      const cell = layoutManager.getCell(gap.cell.row, gap.cell.column + 1)
+      insertNode(cell)
+    }
+  }, [gap, insertNode, layoutManager])
+
+
   return (
     <ReactFlowBase
       onNodeDrag={onNodeDrag}
@@ -417,6 +437,19 @@ function App() {
       <Controls>
         <Checkbox checked={showGrid} onCheckedChange={checked => setShowGrid(checked === true)}/>
       </Controls>
+      { gap &&
+        <div 
+          onClick={onClickInsertNode}
+          className='bg-orange-200 absolute cursor-copy' 
+          style={{
+            top: gap.rect.y,
+            left: gap.rect.x,
+            height: gap.rect.height,
+            width: gap.rect.width,
+            zIndex: 1000,
+          }}
+        ></div>
+      }
     </ReactFlowBase>
   )
 }
