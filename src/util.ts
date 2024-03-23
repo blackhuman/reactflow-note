@@ -65,7 +65,7 @@ export const useEdgesStateEx: typeof useEdgesState = (initialItems) => {
 
 export function useReactFlowEx() {
   const reactFlowInstance = useReactFlow<GridNodeData>()
-  const {getNodes, setNodes, getEdges, setEdges, getNode} = reactFlowInstance
+  const {getNodes, setNodes, getEdges, setEdges, getNode, getZoom} = reactFlowInstance
   const [addHandle, deleteHandle] = useStoreLocal(state => [state.addHandle, state.deleteHandle])
   const updateNodeInternals = useUpdateNodeInternals()
   const {addEdges} = useReactFlow()
@@ -199,6 +199,7 @@ export function useReactFlowEx() {
     insertNode,
     hasNode,
     getNode,
+    getZoom,
   }
 }
 

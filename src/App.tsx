@@ -136,7 +136,7 @@ function BackgroundGrid(props: BackgroundGridProps) {
 
 function App() {
 
-  const { screenToFlowPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode } = useReactFlowEx()
+  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom } = useReactFlowEx()
   const layoutManager = useLayout()
   const [currentRect, setCurrentRect] = useState<Rect|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
@@ -174,12 +174,18 @@ function App() {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
 
     const gap = layoutManager.findGapAt(position)
+    if (gap) {
+      const zoom = getZoom()
+      const {x: width, y: height} = {x: gap.rect.width * zoom, y: gap.rect.height * zoom}
+      const {x, y} = flowToScreenPosition(gap.rect)
+      gap.rect = {x, y, width, height}
+    }
     setGap(gap)
 
     if (connectStartRef.current === undefined) return
     const [rect] = layoutManager.findRectAt(position)!
     setCurrentRect(rect)
-  }, [layoutManager, screenToFlowPosition])
+  }, [flowToScreenPosition, getZoom, layoutManager, screenToFlowPosition])
 
   const onConnectEnd: OnConnectEnd = useCallback((event) => {
     if (event instanceof TouchEvent) return
