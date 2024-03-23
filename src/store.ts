@@ -1,6 +1,5 @@
 import { ConnectingHandle, HandleProps, Position } from "reactflow"
 import { StateCreator, create } from "zustand"
-import { LayoutManager } from "./LayoutManager"
 
 
 interface ReactflowActionStore {
@@ -23,12 +22,10 @@ type AppStore = {
   getHandles(nodeId: string): HandleProps[]
   addHandle(handle: ConnectingHandle): string
   deleteHandle(handle: ConnectingHandle): void
-  layoutManager: LayoutManager
 }
 
 const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
   return {
-    layoutManager: new LayoutManager(),
     isConnecting: false,
     setConnecting(isConnecting) {
       set({isConnecting})

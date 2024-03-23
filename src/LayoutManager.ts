@@ -1,7 +1,10 @@
-import { Rect, XYPosition } from "reactflow"
 import * as d3 from 'd3'
+import { useCallback, useEffect, useRef } from "react"
+import type { Rect } from 'reactflow'
+import { XYPosition } from "reactflow"
+import { Cell, GridNode } from "./util"
 
-interface GridLine {
+export interface GridLine {
   xList: number[]
   yList: number[]
   seperatorPath: string
@@ -13,13 +16,6 @@ interface GridLine {
   maxY: number
 }
 
-interface Cell {
-  rect: Rect
-  row: number
-  column: number
-  nodeId?: string
-}
-
 type Row = {
   index: number
   origin: number
@@ -27,11 +23,6 @@ type Row = {
 }
 
 type Column = Row
-
-type GridIndex = {
-  row: number
-  column: number
-}
 
 export type Gap = {
   rect: Rect
@@ -43,127 +34,76 @@ function isContains(rect: Rect, position: XYPosition): boolean {
     && position.y >= rect.y && position.y <= rect.y + rect.height
 }
 
-class LayoutManager {
+export function useLayout() {
+  const initLength = 100
+  const initCount = 10
+  const initGap = 10
 
-  rows: Map<number, Row> = new Map()
-  columns: Map<number, Column> = new Map()
-  nodes: Map<number, Map<number, Cell>> = new Map()
-  gap = 10
+  const rowsRef = useRef(new Map<number, Row>())
+  const columnsRef = useRef(new Map<number, Column>())
+  const rows = rowsRef.current
+  const columns = columnsRef.current
 
-  constructor() {
-    const initLength = 100
-    const initCount = 10
-    const gap = this.gap
+  useEffect(() => {
     for (let index = -initCount; index < initCount; index++) {
-      this.rows.set(index, {
+      rowsRef.current.set(index, {
         index,
-        origin: index * (initLength + gap),
+        origin: index * (initLength + initGap),
         length: initLength,
       })
-      this.columns.set(index, {
+      columnsRef.current.set(index, {
         index,
-        origin: index * (initLength + gap),
+        origin: index * (initLength + initGap),
         length: initLength,
       })
-      this.nodes.set(index, new Map())
     }
-    console.log('rows', this.rows)
-    console.log('columns', this.columns)
-  }
+  }, [])
 
-  addNode(cell: Cell) {
-    this.nodes.get(cell.row)?.set(cell.column, cell)
-  }
-
-  updateNode(index: GridIndex, cell: Cell) {
-    this.nodes.get(index.row)?.delete(index.column)
-    this.addNode(cell)
-  }
-
-  moveAllNodeToRight(cell: Cell): Cell[] {
-    const nodesMap = this.nodes.get(cell.row)
-    if (!nodesMap) return []
-    const nodes = [...nodesMap.entries()]
-      .sort(([column1,], [column2,]) => column1 - column2)
-      .filter(([column,]) => column >= cell.column)
-      .map(([, node]) => ({...node}))
-    for (const node of nodes) {
-      nodesMap.delete(node.column)
-      node.column = node.column + 1
-      const cell = this.getCell(node.row, node.column)
-      node.rect = cell.rect
-      nodesMap.set(node.column, node)
-    }
-    return nodes
-  }
-
-  insertNode(cell: Cell) {
-    this.moveAllNodeToRight(cell)
-    this.addNode(cell)
-  }
-
-  deleteNode(cell: Cell) {
-    this.nodes.get(cell.row)?.delete(cell.column)
-  }
-
-  hasNode(index: GridIndex): boolean {
-    return this.getNode(index.row, index.column) !== null
-  }
-
-  getNode(rowIndex: number, columnIndex: number): Cell | null {
-    return this.nodes.get(rowIndex)?.get(columnIndex) ?? null
-  }
-
-  getCell(rowIndex: number, columnIndex: number): Cell {
-    const row = this.rows.get(rowIndex)!
-    const column = this.columns.get(columnIndex)!
-    return {
-      rect: {x: column.origin, y: row.origin, width: column.length, height: row.length},
-      row: rowIndex,
-      column: columnIndex
-    }
-  }
-
-  findCellAt(position: XYPosition): Cell | null {
+  const findRectAt = useCallback((position: XYPosition): [Rect, Cell] | null => {
     let row: Row | undefined
-    for (const [, item] of this.rows.entries()) {
+    for (const [, item] of rows.entries()) {
       if (position.y < item.origin) break
       row = item
     }
     let column: Column | undefined
-    for (const [, item] of this.columns.entries()) {
+    for (const [, item] of columns.entries()) {
       if (position.x < item.origin) break
       column = item
     }
     if (!row || !column) return null
-    const recordedNode = this.getNode(row.index, column.index)
-    if (recordedNode) return recordedNode
-    return {
-      rect: {x: column.origin, y: row.origin, width: column.length, height: row.length},
-      row: row.index,
-      column: column.index
-    }
-  }
+    return [
+      {x: column.origin, y: row.origin, width: column.length, height: row.length},
+      {row: row.index, column: column.index}
+    ]
+  }, [columns, rows])
 
-  findGapAt(position: XYPosition): Gap | null {
-    const cell = this.findCellAt(position)
-    if (!cell) return null
-    const gap = {
-      x: cell.rect.x + cell.rect.width, 
-      y: cell.rect.y, 
-      width: this.gap, 
-      height: cell.rect.height
+  const getRect = useCallback((cell: Cell): Rect => {
+    const row = rows.get(cell.row)!
+    const column = columns.get(cell.column)!
+    return {x: column.origin, y: row.origin, width: column.length, height: row.length}
+  }, [columns, rows])
+
+  const findGapAt = useCallback((position: XYPosition): Gap | null => {
+    const result = findRectAt(position)
+    if (!result) return null
+    const [rect,cell] = result
+    if (!rect) return null
+    const gapRect = {
+      x: rect.x + rect.width, 
+      y: rect.y, 
+      width: initGap, 
+      height: rect.height
     }
-    if (isContains(gap, position)) return {rect: gap, cell}
+    if (isContains(gapRect, position)) return {rect: gapRect, cell}
     return null
-  }
+  }, [findRectAt])
 
   // rect 限定区域
-  getGridLinesInViewPort(rect: Rect): GridLine {
-    console.log('getGridLinesInViewPort', rect)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const getGridLinesInViewPort = useCallback((_rect: Rect): GridLine => {
     console.time("getGridLinesInViewPort")
-    const xList = [...this.columns.values()].flatMap(v => [v.origin, v.origin + v.length])
-    const yList = [...this.rows.values()].flatMap(v => [v.origin, v.origin + v.length])
+    const xList = [...columns.values()].flatMap(v => [v.origin, v.origin + v.length])
+    const yList = [...rows.values()].flatMap(v => [v.origin, v.origin + v.length])
     const minX = xList[0]
     const maxX = xList[xList.length - 1]
     const minY = yList[0]
@@ -180,8 +120,8 @@ class LayoutManager {
 
     const rects: Rect[] = []
     const rectsPath = d3.path();
-    for (const row of this.rows.values()) {
-      for (const column of this.columns.values()) {
+    for (const row of rows.values()) {
+      for (const column of columns.values()) {
         rects.push({x: column.origin, y: row.origin, width: column.length, height: row.length})
         // rectsPath.rect(column.origin, row.origin, column.length, row.length)
       }
@@ -199,22 +139,38 @@ class LayoutManager {
     }
     console.timeEnd("getGridLinesInViewPort")
     return result
+  }, [columns, rows])
+
+  const moveAllNodeToRight = useCallback((baseCell: Cell, nodes: GridNode[]): GridNode[] => {
+    return nodes.filter(node => node.data.column > baseCell.column)
+      .map(node => {
+        node.data.column += 1
+        node.position = getRect(node.data)
+        return node
+      })
+  }, [getRect])
+
+  const findAdjacentNode = useCallback((node: GridNode, adjacent: 'left' | 'right', nodes: GridNode[]): GridNode | null => {
+    nodes = nodes.filter(n => n.data.row === node.data.row)
+      .sort((a, b) => a.data.column - b.data.column)
+    const index = nodes.findIndex(n => n.id === node.id)
+    if (index === -1) return null
+    if (adjacent === 'left') {
+      if (index - 1 < 0) return null
+      return nodes[index - 1]
+    } else {
+      if (index + 1 >= nodes.length) return null
+      return nodes[index + 1]
+    }
+  }, [])
+
+  return {
+    getRect,
+    findRectAt,
+    findGapAt,
+    getGridLinesInViewPort,
+    moveAllNodeToRight,
+    findAdjacentNode,
   }
-
-  findAdjacentNode(cell: Cell, adjacent: 'left' | 'right'): Cell | null {
-    const row = this.nodes.get(cell.row)
-    if (!row) return null;
-    const columns = [...row.keys()]
-    if (columns.length < 2) return null
-    const findedIndex = columns.sort((a, b) => adjacent === 'left' ? a - b : b - a)
-      .findIndex(v => v === cell.column)
-    if (findedIndex === -1 || findedIndex - 1 < 0) return null;
-    const conlumnIndex = columns[findedIndex - 1]
-    return row.get(conlumnIndex) ?? null
-  }
-
-}
-
-export {
-  LayoutManager, type GridLine, type Cell
+  
 }

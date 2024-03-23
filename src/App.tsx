@@ -1,196 +1,14 @@
 // import { useState } from 'react'
-import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
-import './App.css'
-import ReactFlow, { Controls, Handle, Panel, Position, useReactFlow, useStoreApi, useUpdateNodeInternals, useViewport, useNodesState, useEdgesState } from 'reactflow';
-import type {ConnectingHandle, Connection, Node, Edge, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnNodesDelete, ReactFlowInstance, XYPosition, OnEdgesDelete} from 'reactflow'
-import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
-import { useStoreLocal } from './store';
-import { Cell, Gap, GridLine } from './LayoutManager';
+import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
+import type { Connection, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect } from 'reactflow';
+import ReactFlow, { Controls, Handle, Panel, Position, useStoreApi, useViewport } from 'reactflow';
+import 'reactflow/dist/style.css';
+import './App.css';
+import { Gap, GridLine, useLayout } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
-
-const GRID_NODE_TYPE_NAME = 'gridNode' as const
-
-type GridNodeData = Cell
-
-const useNodesStateEx: typeof useNodesState<GridNodeData> = (initialItems) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialItems)
-  const updateNodeInternals = useUpdateNodeInternals()
-  const layoutManager = useStoreLocal(state => state.layoutManager)
-  const setNodesEx: typeof setNodes = (nodes) => {
-    setNodes(nodes)
-    if (typeof nodes === 'function') return
-    updateNodeInternals(nodes.map(node => node.id))
-    nodes.forEach(node => layoutManager.addNode(node.data))
-  }
-  return [
-    nodes,
-    setNodesEx,
-    onNodesChange
-  ]
-}
-
-const useEdgesStateEx: typeof useEdgesState = (initialItems) => {
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialItems)
-  const {addEdge} = useReactFlowEx()
-  const setEdgesEx: typeof setEdges = (edges) => {
-    if (typeof edges === 'function') {
-      setEdges(edges)
-      return
-    } else {
-      for (const edge of edges) {
-        addEdge({
-          nodeId: edge.source,
-          handleId: edge.sourceHandle,
-          type: 'source',
-        }, {
-          nodeId: edge.target,
-          handleId: edge.targetHandle,
-          type: 'target',
-        })
-      }
-    }
-  }
-  return [
-    edges, 
-    setEdgesEx, 
-    onEdgesChange
-  ]
-}
-
-type ReactFlowInstanceEx = ReactFlowInstance & {
-  addNode(position: XYPosition): string
-  insertNode(cell: Cell): void
-  deleteNode(node: Node<GridNodeData>): void
-  updateNode(nodeId: string, originData: GridNodeData, targetData: GridNodeData): void
-  addEdge(source: ConnectingHandle, target: ConnectingHandle): void
-  afterDeleteEdge(edge: Edge): void
-  deleteEdge(edge: Edge): void
-}
-
-function useReactFlowEx(): ReactFlowInstanceEx {
-  const reactFlowInstance = useReactFlow<GridNodeData>()//
-  const {getNodes, addNodes, setNodes, getEdges, setEdges} = reactFlowInstance
-  const [addHandle, deleteHandle] = useStoreLocal(state => [state.addHandle, state.deleteHandle])
-  const updateNodeInternals = useUpdateNodeInternals()
-  const {addEdges} = useReactFlow()
-  const layoutManager = useStoreLocal(state => state.layoutManager)
-  const addNode: ReactFlowInstanceEx['addNode'] = (position) => {
-    const cell = layoutManager.findCellAt(position)!
-    const nodeId = `${getNodes().length + 1}`
-    cell.nodeId = nodeId
-    layoutManager.addNode(cell)
-    addNodes({
-      id: nodeId,
-      type: GRID_NODE_TYPE_NAME,
-      position: cell.rect,
-      data: cell,
-    })
-
-    const leftNodeId = layoutManager.findAdjacentNode(cell, 'left')?.nodeId ?? null
-    const rightNodeId = layoutManager.findAdjacentNode(cell, 'right')?.nodeId ?? null
-
-    if (leftNodeId && rightNodeId) {
-      let existEdge: Edge | undefined
-      for (const edge of getEdges()) {
-        if (edge.source === leftNodeId && edge.target === rightNodeId) {
-          existEdge = edge
-          break
-        }
-      }
-      if (existEdge) {
-        console.log('deleteEdge', existEdge)
-        deleteEdge(existEdge)
-        afterDeleteEdge(existEdge)
-      }
-    }
-
-    if (leftNodeId) {
-      addEdge(
-        {nodeId: leftNodeId, type: 'source'},
-        {nodeId, type: 'target'}
-      )
-    }
-    if (rightNodeId) {
-      addEdge(
-        {nodeId, type: 'source'},
-        {nodeId: rightNodeId, type: 'target'}
-      )
-    }
-    console.log('addNode', leftNodeId, rightNodeId)
-    return nodeId
-  }
-  const insertNode: ReactFlowInstanceEx['insertNode'] = (cell) => {
-    const targetNodes = layoutManager.moveAllNodeToRight(cell)
-    console.log('insertNode', targetNodes)
-    setNodes(nodes => nodes.map(node => {
-      const targetNode = targetNodes.find(n => n.nodeId === node.id)
-      if (targetNode) {
-        node.position = targetNode.rect
-        node.data = targetNode
-      }
-      return node
-    }))
-    addNode(cell.rect)
-  }
-  const deleteNode: ReactFlowInstanceEx['deleteNode'] = (node) => {
-    layoutManager.deleteNode(node.data)
-  }
-  const updateNode: ReactFlowInstanceEx['updateNode'] = (nodeId, originData, targetData) => {
-    setNodes(nodes => nodes.map(n => {
-      if (n.id === nodeId) {
-        n.position = targetData.rect
-        n.data = targetData
-        targetData.nodeId = originData.nodeId
-        layoutManager.updateNode(originData, targetData)
-        return n
-      } else {
-        return n
-      }
-    }))
-  }
-  const addEdge: ReactFlowInstanceEx['addEdge'] = (source, target) => {
-    const sourceHandleId = addHandle(source)
-    const targetHandleId = addHandle(target)
-    updateNodeInternals([source.nodeId, target.nodeId])
-    const edge: Edge = {
-      id: `${source.nodeId}_${sourceHandleId}:${target.nodeId}_${targetHandleId}`,
-      source: source.nodeId,
-      sourceHandle: sourceHandleId,
-      target: target.nodeId,
-      targetHandle: targetHandleId,
-    }
-    addEdges(edge)
-  }
-  const afterDeleteEdge: ReactFlowInstanceEx['afterDeleteEdge'] = (edge) => {
-    deleteHandle({nodeId: edge.source, handleId: edge.sourceHandle, type: 'source'})
-    deleteHandle({nodeId: edge.target, handleId: edge.targetHandle, type: 'target'})
-    updateNodeInternals([edge.source, edge.target])
-  }
-  const deleteEdge: ReactFlowInstanceEx['deleteEdge'] = (edge) => {
-    setEdges(edges => edges.filter(e => e.id !== edge.id))
-  }
-  return {
-    ...reactFlowInstance,
-    addNode,
-    deleteNode,
-    updateNode,
-    addEdge,
-    afterDeleteEdge,
-    deleteEdge,
-    insertNode,
-  }
-}
-
-function useOperationReset(): () => void {
-  const {setNodes, setEdges} = useReactFlow()
-  const clearHandle = useStoreLocal(state => state.clearHandle)
-  return () => {
-    setNodes([])
-    setEdges([])
-    clearHandle()
-  }
-}
+import { useStoreLocal } from './store';
+import { GRID_NODE_TYPE_NAME, GridNodeData, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
 
 function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
   const [, setToolbarVisible] = useState(false)
@@ -273,25 +91,24 @@ interface BackgroundGridProps {
   // offsetX: number
   // offsetY: number
   viewBox: string
-  currentCell: Cell | null
+  currentRect: Rect | null
   containerWidth: number
   containerHeight: number
 }
 
 function BackgroundGrid(props: BackgroundGridProps) {
-  const {gridLine, viewBox, currentCell, containerHeight, containerWidth} = props
+  const {gridLine, viewBox, currentRect, containerHeight, containerWidth} = props
   const {minX, maxX, minY, maxY, xList, yList} = gridLine
-  const cellRect = currentCell?.rect
   return (
     <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
       <line x1='0' y1='-200' x2='0' y2='200'></line>
       <rect x='0' y='0' width={15} height={15}></rect>
       <line x1='-200' y1='0' x2='-200' y2='0'></line>
     {
-      cellRect && 
+      currentRect && 
       <rect 
-        x={cellRect.x} y={cellRect.y} 
-        width={cellRect.width} height={cellRect.height}
+        x={currentRect.x} y={currentRect.y} 
+        width={currentRect.width} height={currentRect.height}
         className="stroke-3 fill-red-500"
         ></rect>
     }
@@ -319,9 +136,9 @@ function BackgroundGrid(props: BackgroundGridProps) {
 
 function App() {
 
-  const { screenToFlowPosition, addNode, deleteNode, updateNode, addEdge, afterDeleteEdge, insertNode } = useReactFlowEx()
-  const layoutManager = useStoreLocal(state => state.layoutManager)
-  const [currentCell, setCurrentCell] = useState<Cell|null>(null)
+  const { screenToFlowPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode } = useReactFlowEx()
+  const layoutManager = useLayout()
+  const [currentRect, setCurrentRect] = useState<Rect|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
   const setConnecting = useStoreLocal(state => state.setConnecting)
   const [showGrid, setShowGrid] = useState(true)
@@ -338,18 +155,15 @@ function App() {
 
   const onNodeDrag: NodeDragHandler = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
-    const cell = layoutManager.findCellAt(position)
-    if (cell) {
-      setCurrentCell(cell)
-    }
+    const [rect,] = layoutManager.findRectAt(position)!
+    setCurrentRect(rect)
   }, [layoutManager, screenToFlowPosition])
 
-  const onNodeDragStop: NodeDragHandler = useCallback((_, currentNode) => {
-    if (currentCell !== null) {
-      updateNode(currentNode.id, currentNode.data, currentCell)
-    }
-    setCurrentCell(null)
-  }, [currentCell, updateNode])
+  const onNodeDragStop: NodeDragHandler = useCallback((event, node) => {
+    const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
+    updateNodePosition(node.id, position)
+    setCurrentRect(null)
+  }, [screenToFlowPosition, updateNodePosition])
 
   const onConnectStart: OnConnectStart = useCallback((_, params) => {
     connectStartRef.current = {...params}
@@ -363,35 +177,38 @@ function App() {
     setGap(gap)
 
     if (connectStartRef.current === undefined) return
-    const cell = layoutManager.findCellAt(position)
-    if (cell) {
-      setCurrentCell(cell)
-    }
+    const [rect] = layoutManager.findRectAt(position)!
+    setCurrentRect(rect)
   }, [layoutManager, screenToFlowPosition])
 
   const onConnectEnd: OnConnectEnd = useCallback((event) => {
     if (event instanceof TouchEvent) return
+    if (connectStartRef.current === undefined) return
 
     const source = connectStartRef.current!.nodeId!
+    const sourceNode = getNode(source)!
     connectStartRef.current = undefined
-    setCurrentCell(null)
+    setCurrentRect(null)
     setConnecting(false)
 
     // for create in empty cell
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
-    const cell = layoutManager.findCellAt(position)
-    if (!cell || cell.nodeId) return
-    const target = addNode(cell.rect)
+    const [rect,cell] = layoutManager.findRectAt(position)!
+    if (hasNode(cell)) return
+    const target = addNode(rect)
 
-    addEdge(
-      { nodeId: source, type: 'source' }, 
-      { nodeId: target, type: 'target' }
-    )
-  }, [setConnecting, screenToFlowPosition, layoutManager, addNode, addEdge])
+    if (sourceNode.data.row !== cell.row) {
+      addEdge(
+        { nodeId: source, type: 'source' }, 
+        { nodeId: target, type: 'target' }
+      )
+    }
+  }, [getNode, setConnecting, screenToFlowPosition, layoutManager, hasNode, addNode, addEdge])
 
   const onConnect = useCallback((params: Connection) => {
     const { source, target } = params
     if (source === null || target === null) return
+    connectStartRef.current = undefined
 
     addEdge(
       {nodeId: source, type: 'source'}, 
@@ -404,15 +221,15 @@ function App() {
   }
 
   const onEdgesDelete: OnEdgesDelete = (edges) => {
+    // edges.forEach(deleteEdge)
     edges.forEach(afterDeleteEdge)
   }
 
   const onClickInsertNode = useCallback(() => {
     if (gap) {
-      const cell = layoutManager.getCell(gap.cell.row, gap.cell.column + 1)
-      insertNode(cell)
+      insertNode(gap.cell)
     }
-  }, [gap, insertNode, layoutManager])
+  }, [gap, insertNode])
 
 
   return (
@@ -423,8 +240,8 @@ function App() {
       onConnectStart={onConnectStart}
       onConnectEnd={onConnectEnd}
       onConnect={onConnect}
-      onNodesDelete={onNodeDelete}
       onEdgesDelete={onEdgesDelete}
+      onNodesDelete={onNodeDelete}
       isValidConnection={() => {
         return true
       }}
@@ -432,7 +249,7 @@ function App() {
       onPaneMouseMove={onPaneMouseMove}
     >
       { showGrid && <BackgroundGridComponent
-        currentCell={currentCell}
+        currentRect={currentRect}
         />}
       <Controls>
         <Checkbox checked={showGrid} onCheckedChange={checked => setShowGrid(checked === true)}/>
@@ -455,15 +272,15 @@ function App() {
 }
 
 interface BackgroundGridComponentProps {
-  currentCell: Cell | null
+  currentRect: Rect | null
 }
 
 function BackgroundGridComponent(props: BackgroundGridComponentProps) {
-  const {currentCell} = props
+  const {currentRect: currentCell} = props
   const store = useStoreApi()
   const {width, height} = store.getState()
   const { x, y, zoom } = useViewport()
-  const layoutManager = useStoreLocal(state => state.layoutManager)
+  const layoutManager = useLayout()
   const gridLine = useMemo(() => layoutManager.getGridLinesInViewPort({x: 0, y: 0, width: 100, height: 100}), [layoutManager])
   
   return (
@@ -473,7 +290,7 @@ function BackgroundGridComponent(props: BackgroundGridComponentProps) {
       containerWidth={width}
       gridLine={gridLine} 
       viewBox={`${-x/zoom} ${-y/zoom} ${width/zoom} ${height/zoom}`} 
-      currentCell={currentCell}
+      currentRect={currentCell}
       />
   )
 }
@@ -490,12 +307,12 @@ function ReactFlowBase(props: ReactFlowProps) {
   // const connectNodes = useOperationConnectNodes()
   const reset = useOperationReset()
   const { toObject, addNode } = useReactFlowEx()
-  const layoutManager = useStoreLocal(state => state.layoutManager)
+  const layoutManager = useLayout()
 
   const onInit = useCallback(() => {
     console.log('onInit')
-    const cell = layoutManager.findCellAt({x: 0, y: 0})!
-    addNode(cell.rect)
+    const [rect] = layoutManager.findRectAt({x: 0, y: 0})!
+    addNode(rect)
   }, [addNode, layoutManager])
 
   const flowKey = 'reactflow'//23
