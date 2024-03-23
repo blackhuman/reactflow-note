@@ -45,3 +45,11 @@ div.target-handle {
   @apply stroke-black;
   @apply fill-none;
 }
+
+.react-flow__node.selected {
+  @apply outline-dashed outline-offset-2 outline-blue-300;
+}
+
+.react-flow__node.selectable:focus, .react-flow__node.selectable:focus-visible {
+  @apply outline outline-offset-2 outline-blue-300;
+}
