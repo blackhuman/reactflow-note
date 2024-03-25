@@ -1,4 +1,4 @@
-import type { ConnectingHandle, Edge, Node, XYPosition } from 'reactflow';
+import type { ConnectingHandle, Edge, Node, Rect, XYPosition } from 'reactflow';
 import { useEdgesState, useNodesState, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
@@ -14,6 +14,11 @@ export interface Cell {
 
 interface A {
 
+}
+
+export function isContains(rect: Rect, position: XYPosition): boolean {
+  return position.x >= rect.x && position.x <= rect.x + rect.width
+    && position.y >= rect.y && position.y <= rect.y + rect.height
 }
 
 export type GridNodeData = Cell
@@ -80,7 +85,8 @@ export function useReactFlowEx() {
       type: GRID_NODE_TYPE_NAME,
       position: rect,
       data: cell,
-    }
+      dragHandle: '.note-drag-handle'
+    } as Node<Cell>
     
     nodes.push(node)
     setNodes(nodes)

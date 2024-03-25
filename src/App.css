@@ -24,6 +24,15 @@ div.target-handle {
   opacity: 0;
 }
 
+.note-drag-handle {
+  @apply absolute left-2 bottom-2;
+  width: 10px;
+  height: 10px;
+  background-color: teal;
+  margin: 5px;
+  border-radius: 50%;
+}
+
 .grid-separator {
   stroke-width: 1;
   @apply stroke-black;

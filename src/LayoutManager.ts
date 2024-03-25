@@ -2,7 +2,7 @@ import * as d3 from 'd3'
 import { useCallback, useEffect, useRef } from "react"
 import type { Rect } from 'reactflow'
 import { XYPosition } from "reactflow"
-import { Cell, GridNode } from "./util"
+import { Cell, GridNode, isContains } from "./util"
 
 export interface GridLine {
   xList: number[]
@@ -27,11 +27,6 @@ type Column = Row
 export type Gap = {
   rect: Rect
   cell: Cell
-}
-
-function isContains(rect: Rect, position: XYPosition): boolean {
-  return position.x >= rect.x && position.x <= rect.x + rect.width
-    && position.y >= rect.y && position.y <= rect.y + rect.height
 }
 
 export function useLayout() {

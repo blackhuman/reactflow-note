@@ -1,14 +1,15 @@
 // import { useState } from 'react'
 import { Button } from '@/components/ui/button';
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
-import type { Connection, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect } from 'reactflow';
+import type { Connection, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
 import ReactFlow, { Controls, Handle, Panel, Position, useStoreApi, useViewport } from 'reactflow';
-import 'reactflow/dist/style.css';
+// import 'reactflow/dist/style.css';
 import './App.css';
 import { Gap, GridLine, useLayout } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
 import { useStoreLocal } from './store';
-import { GRID_NODE_TYPE_NAME, GridNodeData, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
+import { GRID_NODE_TYPE_NAME, GridNodeData, isContains, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
+import TextEditor from './TextEditor';
 
 function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
   const [, setToolbarVisible] = useState(false)
@@ -27,12 +28,13 @@ function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
         <Button onClick={() => addHandler(Position.Right)}>Right</Button>
       </NodeToolbar> */}
       <div
-        style={{width: '100px', height: '50px'}} className='border-black rounded-md border-2'
+        style={{width: '100px', minHeight: '50px'}} className='border-black rounded-md border-2'
         onMouseEnter={() => setToolbarVisible(true)}
         onMouseLeave={() => hideToolbarDelay()}
         >
-        <p>{`[${data.row},${data.column}]`}</p>
-        <p>{nodeId}</p>
+        <div className='note-drag-handle'>
+        </div>
+        <TextEditor data={data}/>
         <Handle
           id='1'
           type='target'
@@ -101,9 +103,6 @@ function BackgroundGrid(props: BackgroundGridProps) {
   const {minX, maxX, minY, maxY, xList, yList} = gridLine
   return (
     <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
-      <line x1='0' y1='-200' x2='0' y2='200'></line>
-      <rect x='0' y='0' width={15} height={15}></rect>
-      <line x1='-200' y1='0' x2='-200' y2='0'></line>
     {
       currentRect && 
       <rect 
@@ -134,6 +133,15 @@ function BackgroundGrid(props: BackgroundGridProps) {
   )
 }
 
+function useCheckPositionInNode(): (position: XYPosition) => boolean {
+  const {getNodes} = useReactFlowEx()
+  return useCallback((position) => {
+    const nodes = getNodes()
+    return nodes.some(node => isContains({...node.position, width: node.width!, height: node.height!}, position))
+  }, [getNodes])
+}
+
+
 function App() {
 
   const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom } = useReactFlowEx()
@@ -143,11 +151,13 @@ function App() {
   const setConnecting = useStoreLocal(state => state.setConnecting)
   const [showGrid, setShowGrid] = useState(true)
   const [gap, setGap] = useState<Gap | null>(null)
+  const checkPositionInNode = useCheckPositionInNode()
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
+    if (checkPositionInNode(position)) return
     addNode(position)
-  }, [addNode, screenToFlowPosition])
+  }, [addNode, checkPositionInNode, screenToFlowPosition])
 
   const onNodeDragStart: NodeDragHandler = useCallback(() => {
     // setConnecting(true)
@@ -214,7 +224,6 @@ function App() {
   const onConnect = useCallback((params: Connection) => {
     const { source, target } = params
     if (source === null || target === null) return
-    connectStartRef.current = undefined
 
     addEdge(
       {nodeId: source, type: 'source'}, 
@@ -354,6 +363,7 @@ function ReactFlowBase(props: ReactFlowProps) {
       nodeTypes={nodeTypes}
       zoomOnDoubleClick={false}
       onInit={onInit}
+      defaultViewport={{x: 50, y: 50, zoom: 1}}
     >
       <Panel position="top-right">
         <Button onClick={onSave}>save</Button>
