@@ -10,6 +10,7 @@ export const GRID_NODE_TYPE_NAME = 'gridNode' as const
 export interface Cell {
   row: number
   column: number
+  text?: string 
 }
 
 interface A {
@@ -162,9 +163,9 @@ export function useReactFlowEx() {
   function updateNodePosition(nodeId: string, position: XYPosition): void {
     setNodes(nodes => nodes.map(n => {
       if (n.id !== nodeId) return n
-      const [rect,cell] = layoutManager.findRectAt(position)!
+      const [rect, cell] = layoutManager.findRectAt(position)!
       n.position = rect
-      n.data = cell
+      n.data = {...n.data, ...cell}
       return n
     }))
   }
@@ -193,6 +194,13 @@ export function useReactFlowEx() {
   function hasNode(cell: Cell): boolean {
     return getNodes().filter(node => node.data.row === cell.row && node.data.column === cell.column).length > 0
   }
+  function updateText(nodeId: string, text: string): void {
+    setNodes(nodes => nodes.map(node => {
+      if (node.id !== nodeId) return node
+      node.data.text = text
+      return node
+    }))
+  }
   return {
     ...reactFlowInstance,
     addNode,
@@ -206,6 +214,7 @@ export function useReactFlowEx() {
     hasNode,
     getNode,
     getZoom,
+    updateText,
   }
 }
 

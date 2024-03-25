@@ -34,7 +34,7 @@ function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
         >
         <div className='note-drag-handle'>
         </div>
-        <TextEditor data={data}/>
+        <TextEditor nodeId={nodeId} text={data.text ?? ''}/>
         <Handle
           id='1'
           type='target'

@@ -31,6 +31,7 @@ div.target-handle {
   background-color: teal;
   margin: 5px;
   border-radius: 50%;
+  cursor: grab;
 }
 
 .grid-separator {

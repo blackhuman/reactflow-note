@@ -1,64 +1,49 @@
-import { useEffect, useRef, useState } from "react"
-import { GridNodeData } from "./util"
-import ContentEditable from 'react-contenteditable'
-import {useKeyPress} from 'react-use';
+import { useEffect, useReducer, useRef } from "react";
+import ContentEditable, { ContentEditableEvent } from 'react-contenteditable';
+import { useReactFlowEx } from "./util";
 
 interface TextEditorProps {
-  data: GridNodeData
+  nodeId: string
+  text: string
 }
 
 function TextEditor(props: TextEditorProps) {
-  const {data} = props
-  const tabIndex = (Number(data.row)+1)*100+Number(data.column)
-  const ref = useRef<HTMLDivElement|null>(null)
-  const handleClick = () => {
-    console.log('TextEditor click')
-    if (ref.current) {
-      console.log('TextEditor focus', ref.current)
-      ref.current.focus();
-    }
-  }
-  useEffect(() => {
-  }, [ref])
-  useEffect(() => {
-    ref.current?.addEventListener('focus', () => {
-      console.log('TextEditor focus at tabIndex', tabIndex)
-    })
-    // ref.current?.addEventListener('mousedown', (e) => {
-    //   e.stopPropagation()
-    // })
-  }, [tabIndex])
-
-  const text = useRef('');
-
-  const handleChange = evt => {
-      text.current = evt.target.value;
-  };
-
-  const handleBlur = () => {
-      console.log(text.current);
-  };
-
-  const [content, setContent] = useState("")
-
-  const activeKey = useKeyPress('e')
+  const {nodeId, text} = props
+  // const tabIndex = (Number(data.row)+1)*100+Number(data.column)
+  // const ref = useRef<HTMLDivElement|null>(null)
+  const textRef = useRef(text ?? '')
+  const {updateText} = useReactFlowEx()
+  const [, forceUpdate] = useReducer(x => x + 1, 0)
 
   useEffect(() => {
-    console.log('activeKey', document.activeElement)
-  }, [activeKey])
+    textRef.current = text
+    forceUpdate()
+  }, [text])
+
+  const handleChange = (evt: ContentEditableEvent) => {
+    textRef.current = evt.target.value
+    updateText(nodeId, evt.target.value)
+};
 
   return (
-    <div 
-      onMouseDown={() => console.log('onMouseDown in Editor')}
-      ref={ref} 
-      className="h-full w-full bg-white border-none outline-none rounded-md p-2" 
-      // role="textbox"
-      // onDoubleClick={handleClick} 
-      // id={String(tabIndex)} tabIndex={tabIndex} 
-      contentEditable={true}
-      >
-    </div>
+    <ContentEditable
+      className='h-full w-full border-none outline-none rounded-md p-2'
+      html={textRef.current} onChange={handleChange} />
   )
 }
+
+// class TextEditor extends React.Component<TextEditorProps, {text: string}> {
+//   contentEditable = createRef()
+
+//   constructor(props: TextEditorProps) {
+//     super(props)
+//     this.setState({text: ''})
+//   }
+
+//   handleChange(evt: ContentEditableEvent) {
+//     this.setState({text: evt.target.value})
+//     updateText(nodeId, evt.target.value)
+//   }
+// }
 
 export default TextEditor
