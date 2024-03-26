@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
 import type { Connection, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
 import ReactFlow, { Controls, Handle, Panel, Position, useStoreApi, useViewport } from 'reactflow';
-// import 'reactflow/dist/style.css';
+import 'reactflow/dist/style.css';
 import './App.css';
 import { Gap, GridLine, useLayout } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
@@ -20,71 +20,79 @@ function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
     setTimeout(() => setToolbarVisible(false), 500)
   }
 
-  return (
+  /* <NodeToolbar position={Position.Top}>
+    <Button onClick={() => addHandler(Position.Top)}>Top</Button>
+    <Button onClick={() => addHandler(Position.Left)}>Left</Button>
+    <Button onClick={() => addHandler(Position.Right)}>Right</Button>
+  </NodeToolbar> */
+
+  const initHandles = (
     <>
-      {/* <NodeToolbar position={Position.Top}>
-        <Button onClick={() => addHandler(Position.Top)}>Top</Button>
-        <Button onClick={() => addHandler(Position.Left)}>Left</Button>
-        <Button onClick={() => addHandler(Position.Right)}>Right</Button>
-      </NodeToolbar> */}
-      <div
-        style={{width: '100px', minHeight: '50px'}} className='border-black rounded-md border-2'
-        onMouseEnter={() => setToolbarVisible(true)}
-        onMouseLeave={() => hideToolbarDelay()}
-        >
-        <div className='note-drag-handle'>
-        </div>
-        <TextEditor nodeId={nodeId} text={data.text ?? ''}/>
-        <Handle
-          id='1'
-          type='target'
-          position={Position.Left}
-          isConnectableStart={false}
-          isConnectableEnd={true}
-          isConnectable={true}
-          style={{pointerEvents: `${isConnecting ? 'auto' : 'none'}`}}
-          className='target-handle' 
-          />
-        <Handle
-          id='2'
-          type='source'
-          position={Position.Right}
-          isConnectableStart={true}
-          isConnectableEnd={false}
-          isConnectable={true}
-          className='source-handle' 
-          />
-        {
-          handles.map((props, _, array) => {
-            const isConnectableStart = props.type === 'source'
-            // const isConnectableEnd = props.type === 'target'
-            const style: React.CSSProperties = {}
-            if (isConnectableStart) {
-              const filteredArray = array.filter(v => v.isConnectableStart)
-              const index = filteredArray.findIndex(v => v.id === props.id)
-              style.top = 50 / (filteredArray.length + 1) * (index + 1)
-            } else {
-              const filteredArray = array.filter(v => !v.isConnectableStart)
-              const index = filteredArray.findIndex(v => v.id === props.id)
-              style.top = 50 / (filteredArray.length + 1) * (index + 1)
-            }
-            
-            return (
-              <Handle 
-                key={props.id} 
-                id={props.id}
-                type={props.type}
-                position={props.position}
-                isConnectableStart={isConnectableStart}
-                isConnectableEnd={!isConnectableStart}
-                isConnectable={true}
-                style={style}
-                />
-            )
-          })
-        }
-      </div>
+      <Handle
+        id='1'
+        type='target'
+        position={Position.Left}
+        isConnectableStart={false}
+        isConnectableEnd={true}
+        isConnectable={true}
+        style={{pointerEvents: `${isConnecting ? 'auto' : 'none'}`}}
+        className='target-handle' 
+        />
+      <Handle
+        id='2'
+        type='source'
+        position={Position.Right}
+        isConnectableStart={true}
+        isConnectableEnd={false}
+        isConnectable={true}
+        className='source-handle' 
+        />
     </>
+  )
+
+  const restHandles = (
+    handles.map((props, _, array) => {
+      const isConnectableStart = props.type === 'source'
+      // const isConnectableEnd = props.type === 'target'
+      const style: React.CSSProperties = {}
+      if (isConnectableStart) {
+        const filteredArray = array.filter(v => v.isConnectableStart)
+        const index = filteredArray.findIndex(v => v.id === props.id)
+        style.top = 50 / (filteredArray.length + 1) * (index + 1)
+      } else {
+        const filteredArray = array.filter(v => !v.isConnectableStart)
+        const index = filteredArray.findIndex(v => v.id === props.id)
+        style.top = 50 / (filteredArray.length + 1) * (index + 1)
+      }
+      
+      return (
+        <Handle 
+          key={props.id} 
+          id={props.id}
+          type={props.type}
+          position={props.position}
+          isConnectableStart={isConnectableStart}
+          isConnectableEnd={!isConnectableStart}
+          isConnectable={true}
+          style={style}
+          />
+      )
+    })
+  )
+
+  return (
+    <div
+      className='border-black rounded-md border-2 w-auto h-auto'
+      onMouseEnter={() => setToolbarVisible(true)}
+      onMouseLeave={() => hideToolbarDelay()}
+    >
+      <TextEditor nodeId={nodeId} text={data.text ?? ''}/>
+      
+      {/* rest container */}
+      <div className='note-drag-handle'/>
+      {initHandles}
+      {restHandles}
+    </div>
   )
 }
 

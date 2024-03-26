@@ -86,7 +86,7 @@ export function useReactFlowEx() {
       type: GRID_NODE_TYPE_NAME,
       position: rect,
       data: cell,
-      dragHandle: '.note-drag-handle'
+      // dragHandle: '.note-drag-handle'
     } as Node<Cell>
     
     nodes.push(node)
