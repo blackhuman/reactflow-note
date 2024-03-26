@@ -11,9 +11,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <div className='h-screen w-screen'>
       <ReactFlowProvider>
         <App/>
-        <Analytics/>
-        <SpeedInsights/>
       </ReactFlowProvider>
     </div>
+    <Analytics/>
+    <SpeedInsights/>
   </React.StrictMode>
 )

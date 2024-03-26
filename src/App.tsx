@@ -1,145 +1,16 @@
 // import { useState } from 'react'
 import { Button } from '@/components/ui/button';
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
-import type { Connection, NodeDragHandler, NodeProps, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
-import ReactFlow, { Controls, Handle, Panel, Position, useStoreApi, useViewport } from 'reactflow';
+import type { Connection, NodeDragHandler, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
+import ReactFlow, { Controls, Panel } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
-import { Gap, GridLine, useLayout } from './LayoutManager';
+import BackgroundGrid from './BackgroundGrid';
+import { GridNode } from './GridNode';
+import { Gap, useLayout } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
 import { useStoreLocal } from './store';
-import { GRID_NODE_TYPE_NAME, GridNodeData, isContains, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
-import TextEditor from './TextEditor';
-
-function GridNode({data, id: nodeId}: NodeProps<GridNodeData>) {
-  const [, setToolbarVisible] = useState(false)
-  const handles = useStoreLocal(state => state.getHandles(nodeId))
-  const isConnecting = useStoreLocal(state => state.isConnecting)
-
-  function hideToolbarDelay() {
-    setTimeout(() => setToolbarVisible(false), 500)
-  }
-
-  /* <NodeToolbar position={Position.Top}>
-    <Button onClick={() => addHandler(Position.Top)}>Top</Button>
-    <Button onClick={() => addHandler(Position.Left)}>Left</Button>
-    <Button onClick={() => addHandler(Position.Right)}>Right</Button>
-  </NodeToolbar> */
-
-  const initHandles = (
-    <>
-      <Handle
-        id='1'
-        type='target'
-        position={Position.Left}
-        isConnectableStart={false}
-        isConnectableEnd={true}
-        isConnectable={true}
-        style={{pointerEvents: `${isConnecting ? 'auto' : 'none'}`}}
-        className='target-handle' 
-        />
-      <Handle
-        id='2'
-        type='source'
-        position={Position.Right}
-        isConnectableStart={true}
-        isConnectableEnd={false}
-        isConnectable={true}
-        className='source-handle' 
-        />
-    </>
-  )
-
-  const restHandles = (
-    handles.map((props, _, array) => {
-      const isConnectableStart = props.type === 'source'
-      // const isConnectableEnd = props.type === 'target'
-      const style: React.CSSProperties = {}
-      if (isConnectableStart) {
-        const filteredArray = array.filter(v => v.isConnectableStart)
-        const index = filteredArray.findIndex(v => v.id === props.id)
-        style.top = 50 / (filteredArray.length + 1) * (index + 1)
-      } else {
-        const filteredArray = array.filter(v => !v.isConnectableStart)
-        const index = filteredArray.findIndex(v => v.id === props.id)
-        style.top = 50 / (filteredArray.length + 1) * (index + 1)
-      }
-      
-      return (
-        <Handle 
-          key={props.id} 
-          id={props.id}
-          type={props.type}
-          position={props.position}
-          isConnectableStart={isConnectableStart}
-          isConnectableEnd={!isConnectableStart}
-          isConnectable={true}
-          style={style}
-          />
-      )
-    })
-  )
-
-  return (
-    <div
-      className='border-black rounded-md border-2 w-auto h-auto'
-      onMouseEnter={() => setToolbarVisible(true)}
-      onMouseLeave={() => hideToolbarDelay()}
-    >
-      <TextEditor nodeId={nodeId} text={data.text ?? ''}/>
-      
-      {/* rest container */}
-      <div className='note-drag-handle'/>
-      {initHandles}
-      {restHandles}
-    </div>
-  )
-}
-
-interface BackgroundGridProps {
-  gridLine: GridLine
-  // offsetX: number
-  // offsetY: number
-  viewBox: string
-  currentRect: Rect | null
-  containerWidth: number
-  containerHeight: number
-}
-
-function BackgroundGrid(props: BackgroundGridProps) {
-  const {gridLine, viewBox, currentRect, containerHeight, containerWidth} = props
-  const {minX, maxX, minY, maxY, xList, yList} = gridLine
-  return (
-    <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
-    {
-      currentRect && 
-      <rect 
-        x={currentRect.x} y={currentRect.y} 
-        width={currentRect.width} height={currentRect.height}
-        className="stroke-3 fill-red-500"
-        ></rect>
-    }
-    <g>
-      {
-        // draw vertical lines
-        xList.map((x, i) => {
-          return (
-            <line key={`x${i}`} x1={x} y1={minY} x2={x} y2={maxY} className="grid-separator grid-separator-vertical" />
-          )
-        })
-      }
-      {
-        // draw horizontal lines
-        yList.map((y, i) => {
-          return (
-            <line key={`y${i}`} x1={minX} y1={y} x2={maxX} y2={y} className='grid-separator' />
-          )
-        })
-      }
-    </g>
-    </svg>
-  )
-}
+import { GRID_NODE_TYPE_NAME, isContains, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
 
 function useCheckPositionInNode(): (position: XYPosition) => boolean {
   const {getNodes} = useReactFlowEx()
@@ -271,7 +142,7 @@ function App() {
       onDoubleClick={onDoubleClick}
       onPaneMouseMove={onPaneMouseMove}
     >
-      { showGrid && <BackgroundGridComponent
+      { showGrid && <BackgroundGrid
         currentRect={currentRect}
         />}
       <Controls>
@@ -291,30 +162,6 @@ function App() {
         ></div>
       }
     </ReactFlowBase>
-  )
-}
-
-interface BackgroundGridComponentProps {
-  currentRect: Rect | null
-}
-
-function BackgroundGridComponent(props: BackgroundGridComponentProps) {
-  const {currentRect: currentCell} = props
-  const store = useStoreApi()
-  const {width, height} = store.getState()
-  const { x, y, zoom } = useViewport()
-  const layoutManager = useLayout()
-  const gridLine = useMemo(() => layoutManager.getGridLinesInViewPort({x: 0, y: 0, width: 100, height: 100}), [layoutManager])
-  
-  return (
-
-    <BackgroundGrid 
-      containerHeight={height}
-      containerWidth={width}
-      gridLine={gridLine} 
-      viewBox={`${-x/zoom} ${-y/zoom} ${width/zoom} ${height/zoom}`} 
-      currentRect={currentCell}
-      />
   )
 }
 
