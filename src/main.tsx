@@ -4,7 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { ReactFlowProvider } from 'reactflow'
 import { Analytics } from "@vercel/analytics/react"
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
