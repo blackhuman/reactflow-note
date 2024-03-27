@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
 import { useStoreLocal } from './store';
@@ -9,6 +9,13 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   const [, setToolbarVisible] = useState(false);
   const handles = useStoreLocal(state => state.getHandles(nodeId));
   const isConnecting = useStoreLocal(state => state.isConnecting);
+  const highlitedNodeIds = useStoreLocal(state => state.relatedNodeIds)
+  const [highlited, setHighlited] = useState(false)
+
+  useEffect(() => {
+    const highlited = highlitedNodeIds.some(v => v === nodeId)
+    setHighlited(highlited)
+  }, [highlitedNodeIds, nodeId])
 
   function hideToolbarDelay() {
     setTimeout(() => setToolbarVisible(false), 500);
@@ -72,7 +79,7 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
 
   return (
     <div
-      className='border-black rounded-md border-2 w-auto h-auto'
+      className={`border-black rounded-md border-2 w-auto h-auto ${highlited ? 'bg-yellow-200' : ''}`}
       onMouseEnter={() => setToolbarVisible(true)}
       onMouseLeave={() => hideToolbarDelay()}
     >

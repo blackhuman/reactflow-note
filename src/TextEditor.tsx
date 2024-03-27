@@ -73,18 +73,4 @@ function TextEditor(props: TextEditorProps) {
   )
 }
 
-// class TextEditor extends React.Component<TextEditorProps, {text: string}> {
-//   contentEditable = createRef()
-
-//   constructor(props: TextEditorProps) {
-//     super(props)
-//     this.setState({text: ''})
-//   }
-
-//   handleChange(evt: ContentEditableEvent) {
-//     this.setState({text: evt.target.value})
-//     updateText(nodeId, evt.target.value)
-//   }
-// }
-
 export default TextEditor

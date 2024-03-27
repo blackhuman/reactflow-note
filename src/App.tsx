@@ -1,7 +1,8 @@
 // import { useState } from 'react'
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Connection, NodeDragHandler, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
-import ReactFlow, { Controls, Panel } from 'reactflow';
+import ReactFlow, { Controls, Panel, useOnSelectionChange } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
 import BackgroundGrid from './BackgroundGrid';
@@ -9,8 +10,7 @@ import { GridNode } from './GridNode';
 import { Gap, useLayout } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
 import { GridReactFlowJsonObject, readFlowData, useStoreLocal, writeFlowData } from './store';
-import { GRID_NODE_TYPE_NAME, isContains, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
-import { Link, useParams } from 'react-router-dom';
+import { GRID_NODE_TYPE_NAME, getReleatedAllNodes, isContains, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
 
 function useCheckPositionInNode(): (position: XYPosition) => boolean {
   const {getNodes} = useReactFlowEx()
@@ -23,7 +23,7 @@ function useCheckPositionInNode(): (position: XYPosition) => boolean {
 
 function App() {
 
-  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom } = useReactFlowEx()
+  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom, getEdges } = useReactFlowEx()
   const layoutManager = useLayout()
   const [currentRect, setCurrentRect] = useState<Rect|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
@@ -31,6 +31,7 @@ function App() {
   const [showGrid, setShowGrid] = useState(true)
   const [gap, setGap] = useState<Gap | null>(null)
   const checkPositionInNode = useCheckPositionInNode()
+  const setHighlitedNodeIds = useStoreLocal(state => state.setHighlitedNodeIds)
 
   const onDoubleClick: React.MouseEventHandler<HTMLDivElement> = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
@@ -126,6 +127,15 @@ function App() {
   }, [gap, insertNode])
 
 
+  useOnSelectionChange({
+    onChange: (({nodes}) => {
+      const edges = getEdges()
+      const originalNodeIds = nodes.map(n => n.id)
+      const relatedNodeIds = getReleatedAllNodes(originalNodeIds, edges)
+      setHighlitedNodeIds(relatedNodeIds)
+    })
+  })
+
   return (
     <ReactFlowBase
       onNodeDrag={onNodeDrag}
@@ -182,6 +192,7 @@ function ReactFlowBase(props: ReactFlowProps) {
   const flowId = params.flowId!
   const getFlow = useStoreLocal(state => state.getFlow)
   const [title, setTitle] = useState('')
+  const navigate = useNavigate()
 
   const restore = useCallback((flowData: GridReactFlowJsonObject) => {
     reset()
@@ -192,6 +203,10 @@ function ReactFlowBase(props: ReactFlowProps) {
   const onInit = useCallback(() => {
     console.log('onInit')
     const flowMeta = getFlow(flowId)!
+    if (!flowMeta) {
+      navigate('/404')
+      throw new Error('flow not exist')
+    }
     setTitle(flowMeta.title)
     const flowData = readFlowData(flowId)
     if (flowData) {
@@ -206,7 +221,7 @@ function ReactFlowBase(props: ReactFlowProps) {
     } else {
       throw new Error('flow not exist')
     }
-  }, [addNode, flowId, getFlow, layoutManager, restore])
+  }, [addNode, flowId, getFlow, layoutManager, navigate, restore])
   
   return (
     <ReactFlow

@@ -227,3 +227,29 @@ export function useOperationReset(): () => void {
     clearHandle()
   }
 }
+
+function getRelatedNodes(originalNodeIds: string[], edges: Edge[], direction: 'incoming' | 'outgoing'): string[] {
+  const relatedNodes = new Set<string>(originalNodeIds)
+  const queue = [...originalNodeIds]
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!
+    for (const edge of edges) {
+      if (direction === 'incoming' && edge.target === nodeId) {
+        relatedNodes.add(edge.source)
+        queue.push(edge.source)
+      }
+      if (direction === 'outgoing' && edge.source === nodeId) {
+        relatedNodes.add(edge.target)
+        queue.push(edge.target)
+      }
+    }
+  }
+  return Array.from(relatedNodes)
+}
+
+export function getReleatedAllNodes(originalNodeIds: string[], edges: Edge[]): string[] {
+  return [
+    ...getRelatedNodes(originalNodeIds, edges, 'incoming'),
+    ...getRelatedNodes(originalNodeIds, edges, 'outgoing'),
+  ]
+}

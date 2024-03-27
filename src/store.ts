@@ -24,10 +24,12 @@ type AppStore = {
   getHandles(nodeId: string): HandleProps[]
   addHandle(handle: ConnectingHandle): string
   deleteHandle(handle: ConnectingHandle): void
+  relatedNodeIds: string[]
+  setHighlitedNodeIds(nodeIds: string[]): void
 }
 
 const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
-  return {
+  const a: AppStore = {
     isConnecting: false,
     setConnecting(isConnecting) {
       set({isConnecting})
@@ -65,7 +67,14 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
         return {handleMap: {...state.handleMap, [handle.nodeId]: newHandles}}
       })
     },
+    relatedNodeIds: [],
+    setHighlitedNodeIds(nodeIds) {
+      console.log('setHighlitedNodeIds', nodeIds)
+      set({relatedNodeIds: [...nodeIds]})
+    },
   }
+  console.log('storelocalxx', a)
+  return a
 }
 
 export type GridReactFlowJsonObject = ReactFlowJsonObject<GridNodeData, GridEdgeData>

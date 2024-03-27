@@ -17,7 +17,15 @@ const router = createBrowserRouter([
     element: <Dashboard/>,
   },
   {
-    path: "/:flowId",
+    path: "/404",
+    element: (
+      <div>
+        404
+      </div>
+    )
+  },
+  {
+    path: "/flow/:flowId",
     element: (
       <ReactFlowProvider>
         <App/>

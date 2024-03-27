@@ -12,7 +12,7 @@ function Dashboard() {
 
   const onCreateFlow = useCallback(() => {
     const flowId = createFlow()
-    navigate(`/${flowId}`)
+    navigate(`/flow/${flowId}`)
   }, [createFlow, navigate])
 
   return (
@@ -21,7 +21,7 @@ function Dashboard() {
         <button className="bg-blue-500 text-white px-4 py-2 rounded-md" onClick={onCreateFlow}>Add</button>
         {flowMetaList.map(({ id, title }) => (
           <div key={id} className="bg-gray-200 p-2 m-2 rounded-md">
-            <Link to={`/${id}`}>{title}</Link>
+            <Link to={`/flow/${id}`}>{title}</Link>
           </div>
         ))}
       </div>
