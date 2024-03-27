@@ -230,7 +230,9 @@ function ReactFlowBase(props: ReactFlowProps) {
       edges={edges}
       onNodesChange={(changes) => {
         onNodesChange(changes)
-        writeFlowData(flowId, toObject())
+        const flowData = toObject()
+        flowData.nodes.forEach(node => node.selected = false)
+        writeFlowData(flowId, flowData)
       }}
       onEdgesChange={(changes) => {
         onEdgesChange(changes)
