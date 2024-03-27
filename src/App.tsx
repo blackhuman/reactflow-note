@@ -1,5 +1,4 @@
 // import { useState } from 'react'
-import { Button } from '@/components/ui/button';
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
 import type { Connection, NodeDragHandler, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
 import ReactFlow, { Controls, Panel } from 'reactflow';
@@ -9,8 +8,9 @@ import BackgroundGrid from './BackgroundGrid';
 import { GridNode } from './GridNode';
 import { Gap, useLayout } from './LayoutManager';
 import { Checkbox } from './components/ui/checkbox';
-import { useStoreLocal } from './store';
+import { GridReactFlowJsonObject, readFlowData, useStoreLocal, writeFlowData } from './store';
 import { GRID_NODE_TYPE_NAME, isContains, useEdgesStateEx, useNodesStateEx, useOperationReset, useReactFlowEx } from './util';
+import { Link, useParams } from 'react-router-dom';
 
 function useCheckPositionInNode(): (position: XYPosition) => boolean {
   const {getNodes} = useReactFlowEx()
@@ -178,51 +178,59 @@ function ReactFlowBase(props: ReactFlowProps) {
   const reset = useOperationReset()
   const { toObject, addNode } = useReactFlowEx()
   const layoutManager = useLayout()
+  const params = useParams();
+  const flowId = params.flowId!
+  const getFlow = useStoreLocal(state => state.getFlow)
+  const [title, setTitle] = useState('')
+
+  const restore = useCallback((flowData: GridReactFlowJsonObject) => {
+    reset()
+    setNodes(flowData.nodes || [])
+    setEdges(flowData.edges || [])
+  }, [reset, setEdges, setNodes])
 
   const onInit = useCallback(() => {
     console.log('onInit')
-    const [rect] = layoutManager.findRectAt({x: 0, y: 0})!
-    addNode(rect)
-  }, [addNode, layoutManager])
-
-  const flowKey = 'reactflow'//23
-
-  const onSave = useCallback(() => {
-    const flow = toObject();
-    localStorage.setItem(flowKey, JSON.stringify(flow));
-  }, [toObject]);
-
-  const onRestore = useCallback(() => {
-    const restoreFlow = async () => {
-      const flow = JSON.parse(localStorage.getItem(flowKey)!);
-
-      if (flow) {
-        // const { x = 0, y = 0, zoom = 1 } = flow.viewport;
-        reset()
-        setNodes(flow.nodes || [])
-        setEdges(flow.edges || [])
-        // setViewport({ x, y, zoom });
+    const flowMeta = getFlow(flowId)!
+    setTitle(flowMeta.title)
+    const flowData = readFlowData(flowId)
+    if (flowData) {
+      console.log('restore flow')
+      if (flowData.nodes.length > 0) {
+        restore(flowData)
+      } else {
+        console.log('init flow')
+        const [rect] = layoutManager.findRectAt({x: 0, y: 0})!
+        addNode(rect)
       }
-    };
-
-    restoreFlow();
-  }, [reset, setNodes, setEdges]);
-
+    } else {
+      throw new Error('flow not exist')
+    }
+  }, [addNode, flowId, getFlow, layoutManager, restore])
+  
   return (
     <ReactFlow
       {...props}
       nodes={nodes}
       edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
+      onNodesChange={(changes) => {
+        onNodesChange(changes)
+        writeFlowData(flowId, toObject())
+      }}
+      onEdgesChange={(changes) => {
+        onEdgesChange(changes)
+        writeFlowData(flowId, toObject())
+      }}
       nodeTypes={nodeTypes}
       zoomOnDoubleClick={false}
       onInit={onInit}
       defaultViewport={{x: 50, y: 50, zoom: 1}}
     >
-      <Panel position="top-right">
-        <Button onClick={onSave}>save</Button>
-        <Button onClick={onRestore}>restore</Button>
+      <Panel position='top-center'>
+        {title}
+      </Panel>
+      <Panel position='top-left'>
+        <Link to={'/'}>Dashboard</Link>
       </Panel>
       {props?.children}
     </ReactFlow>

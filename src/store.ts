@@ -1,5 +1,7 @@
-import { ConnectingHandle, HandleProps, Position } from "reactflow"
+import { ConnectingHandle, HandleProps, Position, ReactFlowJsonObject } from "reactflow"
 import { StateCreator, create } from "zustand"
+import { persist } from 'zustand/middleware'
+import { GridEdgeData, GridNodeData } from "./util"
 
 
 interface ReactflowActionStore {
@@ -66,11 +68,66 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
   }
 }
 
-const useStoreLocal = create<AppStore & ReactflowActionStore>((...a) => {
+export type GridReactFlowJsonObject = ReactFlowJsonObject<GridNodeData, GridEdgeData>
+
+const EMPTY_FLOW_DATA: GridReactFlowJsonObject = {
+  nodes: [],
+  edges: [],
+  viewport: {
+    x: 0, y: 0, zoom: 1,
+  }
+} as const
+
+type FlowMetaStore = {
+  id: string
+  title: string
+}
+
+export function readFlowData(flowId: string): GridReactFlowJsonObject | null {
+  const flowRaw = localStorage.getItem(flowId)
+  return flowRaw ? JSON.parse(flowRaw) : null
+}
+
+export function writeFlowData(flowId: string, flow: GridReactFlowJsonObject = EMPTY_FLOW_DATA) {
+  localStorage.setItem(flowId, JSON.stringify(flow))
+}
+
+type FlowStore = {
+  flowMetaList: FlowMetaStore[]
+  createFlow(): string
+  getFlow(flowId: string): FlowMetaStore | undefined
+}
+
+const FLOW_KEY = 'reactflow-note'
+
+const flowStore = persist<FlowStore, [], [], FlowStore>(
+  (set, get) => {
+  
+    return {
+      flowMetaList: [],
+      createFlow() {
+        const flowId = `${FLOW_KEY}_${crypto.randomUUID()}`
+        set({flowMetaList: [...get().flowMetaList, {id: flowId, title: 'New Flow'}]})
+        writeFlowData(flowId)
+        return flowId
+      },
+      getFlow(flowId) {
+        return get().flowMetaList.find(f => f.id === flowId)
+      },
+    }
+  },
+  {
+    name: FLOW_KEY, // name of the item in the storage (must be unique)
+    // storage: createJSONStorage(() => sessionStorage), // (optional) by default, 'localStorage' is used
+  },
+)
+
+const useStoreLocal = create<AppStore & ReactflowActionStore & FlowStore>((...a) => {
   console.log('create useStoreLocal')
   return {
     ...baseStore(...a),
     ...reactflowActionStore(...a),
+    ...flowStore(...a),
   }
 })
 

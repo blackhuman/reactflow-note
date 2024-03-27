@@ -2,8 +2,8 @@ import type { ConnectingHandle, Edge, Node, Rect, XYPosition } from 'reactflow';
 import { useEdgesState, useNodesState, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
-import { useStoreLocal } from './store';
 import { useLayout } from './LayoutManager';
+import { useStoreLocal } from './store';
 
 export const GRID_NODE_TYPE_NAME = 'gridNode' as const
 
@@ -37,7 +37,7 @@ export const useNodesStateEx: typeof useNodesState<GridNodeData> = (initialItems
   return [
     nodes,
     setNodesEx,
-    onNodesChange
+    onNodesChange,
   ]
 }
 

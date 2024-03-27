@@ -5,13 +5,32 @@ import './index.css'
 import { ReactFlowProvider } from 'reactflow'
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import {
+  createBrowserRouter,
+  RouterProvider,
+} from "react-router-dom"
+import Dashboard from './Dashboard.tsx'
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Dashboard/>,
+  },
+  {
+    path: "/:flowId",
+    element: (
+      <ReactFlowProvider>
+        <App/>
+      </ReactFlowProvider>
+    ),
+  },
+]);
+
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <div className='h-screen w-screen'>
-      <ReactFlowProvider>
-        <App/>
-      </ReactFlowProvider>
+      <RouterProvider router={router}/>
     </div>
     <Analytics/>
     <SpeedInsights/>
