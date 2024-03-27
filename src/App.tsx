@@ -1,8 +1,8 @@
 // import { useState } from 'react'
 import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { Connection, NodeDragHandler, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
-import ReactFlow, { Controls, Panel, useOnSelectionChange } from 'reactflow';
+import type { Connection, NodeDragHandler, NodeMouseHandler, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
+import ReactFlow, { Controls, Panel } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
 import BackgroundGrid from './BackgroundGrid';
@@ -126,15 +126,15 @@ function App() {
     }
   }, [gap, insertNode])
 
+  const onNodeClick: NodeMouseHandler = useCallback((_, node) => {
+    const edges = getEdges()
+    const relatedNodeIds = getReleatedAllNodes([node.id], edges)
+    setHighlitedNodeIds(relatedNodeIds)
+  }, [getEdges, setHighlitedNodeIds])
 
-  useOnSelectionChange({
-    onChange: (({nodes}) => {
-      const edges = getEdges()
-      const originalNodeIds = nodes.map(n => n.id)
-      const relatedNodeIds = getReleatedAllNodes(originalNodeIds, edges)
-      setHighlitedNodeIds(relatedNodeIds)
-    })
-  })
+  const onPaneClick = useCallback(() => {
+    setHighlitedNodeIds([])
+  }, [setHighlitedNodeIds])
 
   return (
     <ReactFlowBase
@@ -151,6 +151,8 @@ function App() {
       }}
       onDoubleClick={onDoubleClick}
       onPaneMouseMove={onPaneMouseMove}
+      onNodeClick={onNodeClick}
+      onPaneClick={onPaneClick}
     >
       { showGrid && <BackgroundGrid
         currentRect={currentRect}

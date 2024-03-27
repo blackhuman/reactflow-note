@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { NodeProps } from 'reactflow';
 import { Handle, Position } from 'reactflow';
+import TextEditor from './TextEditor';
 import { useStoreLocal } from './store';
 import { GridNodeData } from './util';
-import TextEditor from './TextEditor';
 
 export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   const [, setToolbarVisible] = useState(false);
@@ -21,11 +21,6 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
     setTimeout(() => setToolbarVisible(false), 500);
   }
 
-  /* <NodeToolbar position={Position.Top}>
-    <Button onClick={() => addHandler(Position.Top)}>Top</Button>
-    <Button onClick={() => addHandler(Position.Left)}>Left</Button>
-    <Button onClick={() => addHandler(Position.Right)}>Right</Button>
-  </NodeToolbar> */
   const initHandles = (
     <>
       <Handle

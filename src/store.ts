@@ -29,7 +29,7 @@ type AppStore = {
 }
 
 const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
-  const a: AppStore = {
+  return {
     isConnecting: false,
     setConnecting(isConnecting) {
       set({isConnecting})
@@ -73,8 +73,6 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
       set({relatedNodeIds: [...nodeIds]})
     },
   }
-  console.log('storelocalxx', a)
-  return a
 }
 
 export type GridReactFlowJsonObject = ReactFlowJsonObject<GridNodeData, GridEdgeData>
