@@ -1,10 +1,8 @@
 // import { useState } from 'react'
-import { ComponentProps, useCallback, useMemo, useRef, useState } from 'react';
+import { ComponentProps, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Connection, NodeDragHandler, NodeMouseHandler, NodeTypes, OnConnectEnd, OnConnectStart, OnConnectStartParams, OnEdgesDelete, OnNodesDelete, Rect, XYPosition } from 'reactflow';
 import ReactFlow, { Controls, Panel } from 'reactflow';
-import 'reactflow/dist/style.css';
-import './App.css';
 import BackgroundGrid from './BackgroundGrid';
 import { GridNode } from './GridNode';
 import { Gap, useLayout } from './LayoutManager';
@@ -189,18 +187,30 @@ function ReactFlowBase(props: ReactFlowProps) {
   // const connectNodes = useOperationConnectNodes()
   const reset = useOperationReset()
   const { toObject, addNode } = useReactFlowEx()
-  const layoutManager = useLayout()
   const params = useParams();
   const flowId = params.flowId!
   const getFlow = useStoreLocal(state => state.getFlow)
   const [title, setTitle] = useState('')
   const navigate = useNavigate()
+  const [grid, setGrid] = useStoreLocal(state => [state.grid, state.setGrid])
+  const {getRect, getDefaultLayout} = useLayout()
 
   const restore = useCallback((flowData: GridReactFlowJsonObject) => {
     reset()
     setNodes(flowData.nodes || [])
     setEdges(flowData.edges || [])
   }, [reset, setEdges, setNodes])
+
+  const save = useCallback(() => {
+    const flowData = toObject()
+    flowData.nodes.forEach(node => node.selected = false)
+    writeFlowData(flowId, flowData)
+  }, [flowId, toObject])
+
+  useEffect(() => {
+    save()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges])
 
   const onInit = useCallback(() => {
     console.log('onInit')
@@ -210,36 +220,42 @@ function ReactFlowBase(props: ReactFlowProps) {
       throw new Error('flow not exist')
     }
     setTitle(flowMeta.title)
+
     const flowData = readFlowData(flowId)
     if (flowData) {
-      console.log('restore flow')
+      console.log('restore flow', flowId, flowData)
+      const grid = getDefaultLayout(flowData.nodes)
+      setGrid(grid)
+
       if (flowData.nodes.length > 0) {
         restore(flowData)
       } else {
         console.log('init flow')
-        const [rect] = layoutManager.findRectAt({x: 0, y: 0})!
-        addNode(rect)
+        addNode({x: 0, y: 0}, false)
       }
     } else {
       throw new Error('flow not exist')
     }
-  }, [addNode, flowId, getFlow, layoutManager, navigate, restore])
+
+  }, [addNode, flowId, getDefaultLayout, getFlow, navigate, restore, setGrid])
+
+  useEffect(() => {
+    setNodes(nodes => {
+      return nodes.map(node => {
+        const rect = getRect(node.data)
+        node.position = rect
+        return node
+      })
+    })
+  }, [getRect, grid, setNodes])
   
   return (
     <ReactFlow
       {...props}
       nodes={nodes}
       edges={edges}
-      onNodesChange={(changes) => {
-        onNodesChange(changes)
-        const flowData = toObject()
-        flowData.nodes.forEach(node => node.selected = false)
-        writeFlowData(flowId, flowData)
-      }}
-      onEdgesChange={(changes) => {
-        onEdgesChange(changes)
-        writeFlowData(flowId, toObject())
-      }}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
       zoomOnDoubleClick={false}
       onInit={onInit}

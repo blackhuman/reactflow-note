@@ -60,7 +60,7 @@ function TextEditor(props: TextEditorProps) {
 
   return (
     <ContentEditable
-      className='w-[100px] min-h-[50px] text-balance break-all border-none outline-none rounded-md p-2 z-50'
+      className='w-full h-full text-balance break-all border-none outline-none rounded-md p-2 z-50'
       innerRef={componentRef}
       onDoubleClick={startComposing}
       onFocus={() => {

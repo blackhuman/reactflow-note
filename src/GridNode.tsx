@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import type { NodeProps } from 'reactflow';
-import { Handle, Position } from 'reactflow';
+import { useCallback, useEffect, useState } from 'react';
+import type { NodeProps, OnResize } from 'reactflow';
+import { Handle, NodeResizeControl, Position } from 'reactflow';
 import TextEditor from './TextEditor';
 import { useStoreLocal } from './store';
-import { GridNodeData } from './util';
+import { GridNodeData, useReactFlowEx } from './util';
+import { useLayout } from './LayoutManager';
 
 export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   const [, setToolbarVisible] = useState(false);
@@ -11,6 +12,8 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   const isConnecting = useStoreLocal(state => state.isConnecting);
   const highlitedNodeIds = useStoreLocal(state => state.relatedNodeIds)
   const [highlited, setHighlited] = useState(false)
+  const { updateRect } = useLayout()
+  const { getNodes } = useReactFlowEx()
 
   useEffect(() => {
     const highlited = highlitedNodeIds.some(v => v === nodeId)
@@ -70,20 +73,51 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
           style={style} />
       );
     })
-  );
+  )
+
+  const onResize: OnResize = useCallback((_, params) => {
+    console.log('direction', params.direction)
+    updateRect(data, params, getNodes())
+  }, [data, getNodes, updateRect])
 
   return (
     <div
-      className={`border-black rounded-md border-2 w-auto h-auto ${highlited ? 'bg-yellow-200' : ''}`}
+      className={`border-black w-full h-full rounded-md border-2 ${highlited ? 'bg-yellow-200' : ''}`}
       onMouseEnter={() => setToolbarVisible(true)}
       onMouseLeave={() => hideToolbarDelay()}
     >
       <TextEditor nodeId={nodeId} text={data.text ?? ''} />
 
       {/* rest container */}
+      <NodeResizeControl 
+        className='resize-control' 
+        minWidth={100} minHeight={100}
+        onResize={onResize}>
+        <ResizeIcon />
+      </NodeResizeControl>
       <div className='note-drag-handle' />
       {initHandles}
       {restHandles}
     </div>
+  )
+}
+
+function ResizeIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      strokeWidth="2"
+      stroke="#ff0071"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <polyline points="16 20 20 20 20 16" />
+      <line x1="14" y1="14" x2="20" y2="20" />
+      <polyline points="8 4 4 4 4 8" />
+      <line x1="4" y1="4" x2="10" y2="10" />
+    </svg>
   );
 }

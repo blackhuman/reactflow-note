@@ -1,7 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
+import 'reactflow/dist/style.css';
 import './index.css'
+import App from './App.tsx'
 import { ReactFlowProvider } from 'reactflow'
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/react"

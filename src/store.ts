@@ -2,7 +2,7 @@ import { ConnectingHandle, HandleProps, Position, ReactFlowJsonObject } from "re
 import { StateCreator, create } from "zustand"
 import { persist } from 'zustand/middleware'
 import { GridEdgeData, GridNodeData } from "./util"
-
+import { Grid } from "./LayoutManager"
 
 interface ReactflowActionStore {
 
@@ -16,6 +16,14 @@ const reactflowActionStore: StateCreator<ReactflowActionStore, [], [], Reactflow
 
 type HandleMap = Record<string, HandleProps[]>
 
+export type Row = {
+  index: number
+  origin: number
+  length: number
+}
+
+export type Column = Row
+
 type AppStore = {
   isConnecting: boolean
   setConnecting(isConnecting: boolean): void
@@ -26,6 +34,12 @@ type AppStore = {
   deleteHandle(handle: ConnectingHandle): void
   relatedNodeIds: string[]
   setHighlitedNodeIds(nodeIds: string[]): void
+  grid: Grid
+  setGrid(grid: Grid): void
+  maxGridLines: {
+    rows: Map<number, number>
+    columns: Map<number, number>
+  }
 }
 
 const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
@@ -72,6 +86,17 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
       console.log('setHighlitedNodeIds', nodeIds)
       set({relatedNodeIds: [...nodeIds]})
     },
+    grid: {
+      rows: new Map(),
+      columns: new Map(),
+    },
+    setGrid(grid) {
+      set({grid})
+    },
+    maxGridLines: {
+      rows: new Map(),
+      columns: new Map(),
+    }
   }
 }
 
@@ -92,11 +117,14 @@ type FlowMetaStore = {
 
 export function readFlowData(flowId: string): GridReactFlowJsonObject | null {
   const flowRaw = localStorage.getItem(flowId)
-  return flowRaw ? JSON.parse(flowRaw) : null
+  const flow = flowRaw ? JSON.parse(flowRaw) : null
+  return flow
 }
 
 export function writeFlowData(flowId: string, flow: GridReactFlowJsonObject = EMPTY_FLOW_DATA) {
-  localStorage.setItem(flowId, JSON.stringify(flow))
+  if (flow.nodes.length === 0) return
+  const flowRaw = JSON.stringify(flow)
+  localStorage.setItem(flowId, flowRaw)
 }
 
 type FlowStore = {

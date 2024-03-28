@@ -1,12 +1,10 @@
-@tailwind utilities;
-
 div.source-handle {
   width: 10px;
   height: 10px;
   position: absolute;
   top: auto;
   bottom: 5px;
-  right: 5px;
+  right: 25px;
   transform: none;
   border: none;
   opacity: 1;
@@ -25,6 +23,24 @@ div.target-handle {
   border: none;
   opacity: 0;
   margin: 0px;
+}
+
+.react-flow__resize-control.handle {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+  border: none;
+  position: absolute;
+  top: auto !important;
+  left: auto !important;
+  bottom: 5px;
+  right: 5px;
+  transform: none;
+}
+
+.resize-control {
+  width: 11px;
+  height: 11px;
 }
 
 .note-drag-handle {

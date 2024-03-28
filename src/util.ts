@@ -4,6 +4,7 @@ import 'reactflow/dist/style.css';
 import './App.css';
 import { useLayout } from './LayoutManager';
 import { useStoreLocal } from './store';
+import { useCallback } from 'react';
 
 export const GRID_NODE_TYPE_NAME = 'gridNode' as const
 
@@ -29,11 +30,11 @@ export type GridNode = Node<GridNodeData>
 export const useNodesStateEx: typeof useNodesState<GridNodeData> = (initialItems) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialItems)
   const updateNodeInternals = useUpdateNodeInternals()
-  const setNodesEx: typeof setNodes = (nodes) => {
+  const setNodesEx: typeof setNodes = useCallback((nodes) => {
     setNodes(nodes)
     if (typeof nodes === 'function') return
     updateNodeInternals(nodes.map(node => node.id))
-  }
+  }, [setNodes, updateNodeInternals])
   return [
     nodes,
     setNodesEx,
@@ -77,15 +78,23 @@ export function useReactFlowEx() {
   const {addEdges} = useReactFlow()
   const layoutManager = useLayout()
 
-  function addNode(position: XYPosition): string {
+  function addNode(position: XYPosition, findInGrid: boolean = true): string {
     const nodes = getNodes()
-    const [rect, cell] = layoutManager.findRectAt(position)!
+    let rect: Rect = {x: position.x, y: position.y, width: 100, height: 100}
+    let cell: Cell = {row: 0, column: 0}
+    if (findInGrid) {
+      [rect, cell] = layoutManager.findRectAt(position)!
+    }
     const nodeId = `${nodes.length + 1}`
     const node = {
       id: nodeId,
       type: GRID_NODE_TYPE_NAME,
-      position: rect,
+      position: {x: rect.x, y: rect.y},
       data: cell,
+      style: {
+        width: rect.width,
+        height: rect.height,
+      }
       // dragHandle: '.note-drag-handle'
     } as Node<Cell>
     
