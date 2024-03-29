@@ -90,6 +90,7 @@ function App() {
     const [rect,cell] = layoutManager.findRectAt(position)!
     if (hasNode(cell)) return
     const target = addNode(rect)
+    if (target === null) return
 
     if (sourceNode.data.row !== cell.row) {
       addEdge(

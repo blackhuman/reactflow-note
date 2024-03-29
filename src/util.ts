@@ -78,13 +78,15 @@ export function useReactFlowEx() {
   const {addEdges} = useReactFlow()
   const layoutManager = useLayout()
 
-  function addNode(position: XYPosition, findInGrid: boolean = true): string {
+  function addNode(position: XYPosition, findInGrid: boolean = true): string | null {
     const nodes = getNodes()
     let rect: Rect = {x: position.x, y: position.y, width: 100, height: 100}
     let cell: Cell = {row: 0, column: 0}
     if (findInGrid) {
       [rect, cell] = layoutManager.findRectAt(position)!
     }
+    const isNodeExist = nodes.some(n => n.data.row === cell.row && n.data.column === cell.column)
+    if (isNodeExist) return null
     const existIds = [...nodes.map(n => Number(n.id)), 0]
     const nodeId = `${Math.max(...existIds) + 1}`
     const node = {
