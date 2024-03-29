@@ -110,11 +110,12 @@ function App() {
   }, [addEdge])
 
   const onNodeDelete: OnNodesDelete = (nodes) => {
+    console.log('onNodeDelete')
     nodes.forEach(deleteNode)
   }
 
   const onEdgesDelete: OnEdgesDelete = (edges) => {
-    // edges.forEach(deleteEdge)
+    console.log('onEdgesDelete')
     edges.forEach(afterDeleteEdge)
   }
 
@@ -249,6 +250,11 @@ function ReactFlowBase(props: ReactFlowProps) {
       })
     })
   }, [getRect, grid, setNodes])
+
+  useEffect(() => {
+    console.log('App mounted')
+    return () => console.log('App Unmounted')
+  }, [])
   
   return (
     <ReactFlow

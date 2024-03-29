@@ -80,13 +80,13 @@ export function useReactFlowEx() {
 
   function addNode(position: XYPosition, findInGrid: boolean = true): string {
     const nodes = getNodes()
-    console.log('nodes length', nodes.length)
     let rect: Rect = {x: position.x, y: position.y, width: 100, height: 100}
     let cell: Cell = {row: 0, column: 0}
     if (findInGrid) {
       [rect, cell] = layoutManager.findRectAt(position)!
     }
-    const nodeId = `${nodes.length + 1}`
+    const existIds = [...nodes.map(n => Number(n.id)), 0]
+    const nodeId = `${Math.max(...existIds) + 1}`
     const node = {
       id: nodeId,
       type: GRID_NODE_TYPE_NAME,
@@ -153,13 +153,11 @@ export function useReactFlowEx() {
         return node
       }
     }))
-    const rect = layoutManager.getRect({...cell, column: cell.column + 1})
+    const rect = layoutManager.getRect(cell)
     addNode(rect)
   }
   function deleteNode(node: GridNode) {
     const nodes = getNodes()
-    const hasDeletedNode = nodes.filter(n => n.id === node.id).length > 0
-    console.log('deleteNode', node, hasDeletedNode)
     const leftNode = layoutManager.findAdjacentNode(node, 'left', nodes)
     const rightNode = layoutManager.findAdjacentNode(node, 'right', nodes)
 
@@ -183,19 +181,24 @@ export function useReactFlowEx() {
     const sourceHandleId = addHandle(source)
     const targetHandleId = addHandle(target)
     updateNodeInternals([source.nodeId, target.nodeId])
-    const edge: Edge = {
-      id: `${source.nodeId}_${sourceHandleId}:${target.nodeId}_${targetHandleId}`,
-      source: source.nodeId,
-      sourceHandle: sourceHandleId,
-      target: target.nodeId,
-      targetHandle: targetHandleId,
-    }
-    addEdges(edge)
+    requestAnimationFrame(() => {
+      const edge: Edge = {
+        id: `${source.nodeId}_${sourceHandleId}:${target.nodeId}_${targetHandleId}`,
+        source: source.nodeId,
+        sourceHandle: sourceHandleId,
+        target: target.nodeId,
+        targetHandle: targetHandleId,
+      }
+      addEdges(edge)
+    })
   }
   function afterDeleteEdge(edge: Edge): void {
-    deleteHandle({nodeId: edge.source, handleId: edge.sourceHandle, type: 'source'})
-    deleteHandle({nodeId: edge.target, handleId: edge.targetHandle, type: 'target'})
-    updateNodeInternals([edge.source, edge.target])
+    console.log('afterDeleteEdge for egde', edge.id)
+    requestAnimationFrame(() => {
+      deleteHandle({nodeId: edge.source, handleId: edge.sourceHandle, type: 'source'})
+      deleteHandle({nodeId: edge.target, handleId: edge.targetHandle, type: 'target'})
+      updateNodeInternals([edge.source, edge.target])
+    })
   }
   function deleteEdge(edge: Edge): void {
     console.log('deleteEdge')

@@ -1,14 +1,16 @@
+import { useContext } from "react"
 import { ConnectingHandle, HandleProps, Position, ReactFlowJsonObject } from "reactflow"
-import { StateCreator, create } from "zustand"
+import { StateCreator, StoreApi, useStore } from "zustand"
 import { persist } from 'zustand/middleware'
-import { GridEdgeData, GridNodeData } from "./util"
 import { Grid } from "./LayoutManager"
+import { StoreContext } from "./store-provider"
+import { GridEdgeData, GridNodeData } from "./util"
 
-interface ReactflowActionStore {
+export interface ReactflowActionStore {
 
 }
 
-const reactflowActionStore: StateCreator<ReactflowActionStore, [], [], ReactflowActionStore> = () => {
+export const reactflowActionStore: StateCreator<ReactflowActionStore, [], [], ReactflowActionStore> = () => {
   return {
 
   }
@@ -24,7 +26,7 @@ export type Row = {
 
 export type Column = Row
 
-type AppStore = {
+export type AppStore = {
   isConnecting: boolean
   setConnecting(isConnecting: boolean): void
   handleMap: HandleMap
@@ -46,7 +48,7 @@ type AppStore = {
   }
 }
 
-const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
+export const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
   console.log('init baseStore')
   return {
     isConnecting: false,
@@ -139,7 +141,7 @@ export function deleteFlowData(flowId: string) {
   localStorage.removeItem(flowId)
 }
 
-type FlowStore = {
+export type FlowStore = {
   flowMetaList: FlowMetaStore[]
   createFlow(): string
   deleteFlow(flowId: string): void
@@ -148,7 +150,7 @@ type FlowStore = {
 
 const FLOW_KEY = 'reactflow-note'
 
-const flowStore = persist<FlowStore, [], [], Pick<FlowStore, 'flowMetaList'>>(
+export const flowStore = persist<FlowStore, [], [], Pick<FlowStore, 'flowMetaList'>>(
   (set, get) => {
   
     return {
@@ -179,14 +181,26 @@ const flowStore = persist<FlowStore, [], [], Pick<FlowStore, 'flowMetaList'>>(
   },
 )
 
-const useStoreLocal = create<AppStore & ReactflowActionStore & FlowStore>((...a) => {
-  console.log('create useStoreLocal')
-  return {
-    ...baseStore(...a),
-    ...reactflowActionStore(...a),
-    ...flowStore(...a),
+// const useStoreLocal = create<AppStore & ReactflowActionStore & FlowStore>((...a) => {
+//   console.log('create useStoreLocal')
+//   return {
+//     ...baseStore(...a),
+//     ...reactflowActionStore(...a),
+//     ...flowStore(...a),
+//   }
+// })
+
+const useStoreLocal = <T>(
+  selector: (state: ExtractState<StoreApi<AppStore & ReactflowActionStore & FlowStore>>) => T
+) => {
+  const store = useContext(StoreContext)
+  if (!store) {
+    throw new Error('Missing StoreProvider')
   }
-})
+  return useStore(store, selector)
+}
+
+type ExtractState<S> = S extends { getState: () => infer X } ? X : never
 
 export {
   useStoreLocal

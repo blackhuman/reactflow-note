@@ -11,11 +11,16 @@ import {
   RouterProvider,
 } from "react-router-dom"
 import Dashboard from './Dashboard.tsx'
+import { StoreProvider } from './store-provider.tsx';
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Dashboard/>,
+    element: (
+      <StoreProvider>
+        <Dashboard/>
+      </StoreProvider>
+    ),
   },
   {
     path: "/404",
@@ -29,7 +34,9 @@ const router = createBrowserRouter([
     path: "/flow/:flowId",
     element: (
       <ReactFlowProvider>
-        <App/>
+        <StoreProvider>
+          <App/>
+        </StoreProvider>
       </ReactFlowProvider>
     ),
   },

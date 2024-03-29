@@ -21,14 +21,35 @@ export type Grid = {
 
 export function findRectAtWithGrid(position: XYPosition, grid: Grid): [Rect, Cell] | null {
   let row: Row | undefined
-  for (const [, item] of grid.rows.entries()) {
+  for (const [, item] of grid.rows) {
     if (position.y < item.origin) break
     row = item
   }
   let column: Column | undefined
-  for (const [, item] of grid.columns.entries()) {
+  for (const [, item] of grid.columns) {
     if (position.x < item.origin) break
     column = item
+  }
+  if (!row || !column) return null
+  return [
+    {x: column.origin, y: row.origin, width: column.length, height: row.length},
+    {row: row.index, column: column.index}
+  ]
+}
+
+export function findGapAtWithGrid(position: XYPosition, grid: Grid): [Rect, Cell] | null {
+  let row: Row | undefined
+  for (const [, item] of grid.rows) {
+    if (position.y < item.origin) break
+    row = item
+  }
+  let column: Column | undefined
+  for (const [, item] of grid.columns) {
+    if (item.origin - 10 < position.x) {
+      column = item
+    } else {
+      break
+    }
   }
   if (!row || !column) return null
   return [
@@ -114,7 +135,7 @@ export function useLayout() {
 
   // cell width is not included gap
   const findGapAt = useCallback((position: XYPosition): Gap | null => {
-    const result = findRectAt(position)
+    const result = findGapAtWithGrid(position, grid)
     if (!result) return null
     const [rect,cell] = result
     const gapRect = {
@@ -125,7 +146,7 @@ export function useLayout() {
     }
     if (isContains(gapRect, position)) return {rect: gapRect, cell}
     return null
-  }, [findRectAt])
+  }, [grid])
 
   // rect 限定区域
   const gridLinesInViewPort = useMemo((): GridLine => {
@@ -151,7 +172,7 @@ export function useLayout() {
   }, [grid.columns, grid.rows, gridCount.columnCount, gridCount.rowCount])
 
   const moveAllNodeToRight = useCallback((baseCell: Cell, nodes: GridNode[]): GridNode[] => {
-    return nodes.filter(node => node.data.column > baseCell.column)
+    return nodes.filter(node => node.data.column >= baseCell.column)
       .map(node => {
         node.data.column += 1
         node.position = getRect(node.data)
