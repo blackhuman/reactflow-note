@@ -12,7 +12,7 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   const isConnecting = useStoreLocal(state => state.isConnecting);
   const highlitedNodeIds = useStoreLocal(state => state.relatedNodeIds)
   const [highlited, setHighlited] = useState(false)
-  const { updateRect } = useLayout()
+  const { updateGrid } = useLayout()
   const { getNodes } = useReactFlowEx()
 
   useEffect(() => {
@@ -75,10 +75,9 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
     })
   )
 
-  const onResize: OnResize = useCallback((_, params) => {
-    console.log('direction', params.direction)
-    updateRect(data, params, getNodes())
-  }, [data, getNodes, updateRect])
+  const onResize: OnResize = useCallback(() => {
+    updateGrid(getNodes())
+  }, [getNodes, updateGrid])
 
   return (
     <div

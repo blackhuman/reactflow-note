@@ -1,6 +1,5 @@
 import { Rect, useStoreApi, useViewport } from "reactflow"
 import { useLayout, GridLine } from "./LayoutManager"
-import { useEffect } from "react"
 
 interface BackgroundGridComponentProps {
   currentRect: Rect | null
@@ -12,10 +11,6 @@ function BackgroundGridComponent(props: BackgroundGridComponentProps) {
   const {width, height} = store.getState()
   const { x, y, zoom } = useViewport()
   const {gridLinesInViewPort} = useLayout()
-
-  useEffect(()=>{
-    console.log('gridLinesInViewPort')
-  }, [gridLinesInViewPort])
   
   return (
     <BackgroundGrid 
@@ -40,7 +35,9 @@ interface BackgroundGridProps {
 
 function BackgroundGrid(props: BackgroundGridProps) {
   const {gridLine, viewBox, currentRect, containerHeight, containerWidth} = props
-  const {minX, maxX, minY, maxY, xList, yList} = gridLine
+  const {xList, yList} = gridLine
+  const minX = xList[0], maxX = xList[xList.length - 1]
+  const minY = yList[0], maxY = yList[yList.length - 1]
   return (
     <svg x='0' y='0' height={containerHeight} width={containerWidth} viewBox={viewBox} >
     {

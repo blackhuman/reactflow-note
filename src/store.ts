@@ -35,6 +35,10 @@ type AppStore = {
   relatedNodeIds: string[]
   setHighlitedNodeIds(nodeIds: string[]): void
   grid: Grid
+  gridCount: {
+    rowCount: number,
+    columnCount: number,
+  }
   setGrid(grid: Grid): void
   maxGridLines: {
     rows: Map<number, number>
@@ -43,6 +47,7 @@ type AppStore = {
 }
 
 const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
+  console.log('init baseStore')
   return {
     isConnecting: false,
     setConnecting(isConnecting) {
@@ -90,6 +95,10 @@ const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
       rows: new Map(),
       columns: new Map(),
     },
+    gridCount: {
+      rowCount: 0,
+      columnCount: 0,
+    },
     setGrid(grid) {
       set({grid})
     },
@@ -122,20 +131,24 @@ export function readFlowData(flowId: string): GridReactFlowJsonObject | null {
 }
 
 export function writeFlowData(flowId: string, flow: GridReactFlowJsonObject = EMPTY_FLOW_DATA) {
-  if (flow.nodes.length === 0) return
   const flowRaw = JSON.stringify(flow)
   localStorage.setItem(flowId, flowRaw)
+}
+
+export function deleteFlowData(flowId: string) {
+  localStorage.removeItem(flowId)
 }
 
 type FlowStore = {
   flowMetaList: FlowMetaStore[]
   createFlow(): string
+  deleteFlow(flowId: string): void
   getFlow(flowId: string): FlowMetaStore | undefined
 }
 
 const FLOW_KEY = 'reactflow-note'
 
-const flowStore = persist<FlowStore, [], [], FlowStore>(
+const flowStore = persist<FlowStore, [], [], Pick<FlowStore, 'flowMetaList'>>(
   (set, get) => {
   
     return {
@@ -146,6 +159,10 @@ const flowStore = persist<FlowStore, [], [], FlowStore>(
         writeFlowData(flowId)
         return flowId
       },
+      deleteFlow(flowId) {
+        set({flowMetaList: [...get().flowMetaList.filter(v => v.id !== flowId)]})
+        deleteFlowData(flowId)
+      },
       getFlow(flowId) {
         return get().flowMetaList.find(f => f.id === flowId)
       },
@@ -154,6 +171,11 @@ const flowStore = persist<FlowStore, [], [], FlowStore>(
   {
     name: FLOW_KEY, // name of the item in the storage (must be unique)
     // storage: createJSONStorage(() => sessionStorage), // (optional) by default, 'localStorage' is used
+    partialize(state) {
+      return {
+        flowMetaList: state.flowMetaList,
+      }
+    },
   },
 )
 

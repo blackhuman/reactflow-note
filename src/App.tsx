@@ -203,6 +203,7 @@ function ReactFlowBase(props: ReactFlowProps) {
 
   const save = useCallback(() => {
     const flowData = toObject()
+    if (flowData.nodes.length === 0) return
     flowData.nodes.forEach(node => node.selected = false)
     writeFlowData(flowId, flowData)
   }, [flowId, toObject])
@@ -260,6 +261,8 @@ function ReactFlowBase(props: ReactFlowProps) {
       zoomOnDoubleClick={false}
       onInit={onInit}
       defaultViewport={{x: 50, y: 50, zoom: 1}}
+      translateExtent={[[0, 0], [Infinity, Infinity]]}
+      nodeExtent={[[0, 0], [Infinity, Infinity]]}
     >
       <Panel position='top-center'>
         {title}

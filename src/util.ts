@@ -80,6 +80,7 @@ export function useReactFlowEx() {
 
   function addNode(position: XYPosition, findInGrid: boolean = true): string {
     const nodes = getNodes()
+    console.log('nodes length', nodes.length)
     let rect: Rect = {x: position.x, y: position.y, width: 100, height: 100}
     let cell: Cell = {row: 0, column: 0}
     if (findInGrid) {
@@ -92,8 +93,8 @@ export function useReactFlowEx() {
       position: {x: rect.x, y: rect.y},
       data: cell,
       style: {
-        width: rect.width,
-        height: rect.height,
+        width: 100,
+        height: 100,
       }
       // dragHandle: '.note-drag-handle'
     } as Node<Cell>

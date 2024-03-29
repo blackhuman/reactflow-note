@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react"
-import type { Dimensions, Rect } from 'reactflow'
+import type { Rect } from 'reactflow'
 import { XYPosition } from "reactflow"
 import { Column, Row, useStoreLocal } from './store'
 import { Cell, GridNode, isContains } from "./util"
@@ -7,10 +7,6 @@ import { Cell, GridNode, isContains } from "./util"
 export interface GridLine {
   xList: number[]
   yList: number[]
-  minX: number
-  maxX: number
-  minY: number
-  maxY: number
 }
 
 export type Gap = {
@@ -46,100 +42,64 @@ export function useLayout() {
   const initCount = 10
   const initGap = 10
 
-  const [grid, setGrid] = useStoreLocal(state => [state.grid, state.setGrid])
+  const [grid, setGrid, gridCount] = useStoreLocal(state => [state.grid, state.setGrid, state.gridCount])
   const maxGridLines = useStoreLocal(state => state.maxGridLines)
 
   const refreshMaxGridLines = useCallback((nodes: GridNode[]) => {
-    const rowsMax = maxGridLines.rows
-    const columnsMax = maxGridLines.columns
+    maxGridLines.rows.clear()
+    maxGridLines.columns.clear()
     for (const node of nodes) {
       const row = node.data.row
       const height = node.height ?? initLength
-      const rowMax = rowsMax.get(row)
+      const rowMax = maxGridLines.rows.get(row)
       if (!rowMax || height > rowMax) {
-        rowsMax.set(row, height)
+        maxGridLines.rows = maxGridLines.rows.set(row, height)
       }
   
       const column = node.data.column
       const width = node.width ?? initLength
-      const columnMax = columnsMax.get(column)
+      const columnMax = maxGridLines.columns.get(column)
       if (!columnMax || width > columnMax) {
-        columnsMax.set(column, width)
+        maxGridLines.columns = maxGridLines.columns.set(column, width)
       }
     }
-  }, [maxGridLines.columns, maxGridLines.rows])
+  }, [maxGridLines])
 
-  const _updateGrid = useCallback((cell: Cell, dimensions: Dimensions, grid: Grid): Grid => {
-    const newGrid: Grid = {
-      rows: new Map(grid.rows),
-      columns: new Map(grid.columns),
+  const buildGrid = useCallback((): Grid => {
+    const grid = {
+      rows: new Map(),
+      columns: new Map(),
     }
 
-    // pan move right or bottom Cells in Grid
-    const rowOffset = dimensions.height - grid.rows.get(cell.row)!.length
-    const columnOffset = dimensions.width - grid.columns.get(cell.column)!.length
+    let lastRowStop = initGap
+    let lastColumnStop = initGap
+    for (let index = 0; index < initCount; index++) {
+      const height = maxGridLines.rows.get(index) ?? initLength
+      grid.rows.set(index, {
+        index,
+        origin: lastRowStop,
+        length: height
+      })
+      lastRowStop += height + initGap
 
-    const newRows = newGrid.rows
-    const newColumns = newGrid.columns
-  
-    console.log('_updateRect', cell, dimensions, newGrid)
-    // update current Cell in Grid
-    const maxRows = maxGridLines.rows
-    const maxColumns = maxGridLines.columns
-    newRows.get(cell.row)!.length = Math.max(maxRows.get(cell.row)!, dimensions.height)
-    newColumns.get(cell.column)!.length = Math.max(maxColumns.get(cell.column)!, dimensions.width)
-  
-    // newRows.forEach((row) => {
-    //   if (row.index > cell.row) {
-    //     row.origin += rowOffset
-    //   }
-    // })
-    // newColumns.forEach((column) => {
-    //   if (column.index > cell.column) {
-    //     column.origin += columnOffset
-    //   }
-    // })
-    return newGrid
-  }, [maxGridLines.columns, maxGridLines.rows])
+      const width = maxGridLines.columns.get(index) ?? initLength
+      grid.columns.set(index, {
+        index,
+        origin: lastColumnStop,
+        length: width
+      })
+      lastColumnStop += width + initGap
+    }
+    gridCount.rowCount = initCount
+    gridCount.columnCount = initCount
+    return grid
+  }, [gridCount, maxGridLines.columns, maxGridLines.rows])
   
   const getDefaultLayout = useCallback((nodes: GridNode[]): Grid => {
-    // default Grid
-    const grid: Grid =  {
-      rows: new Map<number, Row>(),
-      columns: new Map<number, Column>(),
-    }
-    const rows = grid.rows
-    const columns = grid.columns
-    const rowsMax = maxGridLines.rows
-    const columnsMax = maxGridLines.columns
-    for (let index = -initCount; index < initCount; index++) {
-      rows.set(index, {
-        index,
-        origin: index * (initLength + initGap),
-        length: initLength,
-      })
-      rowsMax.set(index, initLength)
-  
-      columns.set(index, {
-        index,
-        origin: index * (initLength + initGap),
-        length: initLength,
-      })
-      columnsMax.set(index, initLength)
-    }
-
     refreshMaxGridLines(nodes)
+    return buildGrid()
+  }, [buildGrid, refreshMaxGridLines])
   
-    for(const node of nodes) {
-      const newGrid = _updateGrid(node.data, {width: node.width ?? initLength, height: node.height ?? initLength}, grid)
-      grid.rows = newGrid.rows
-      grid.columns = newGrid.columns
-    }
-    
-    return grid
-  }, [_updateGrid, maxGridLines.columns, maxGridLines.rows, refreshMaxGridLines])
-  
-
   const getRect = useCallback((cell: Cell): Rect => {
     const row = grid.rows.get(cell.row)!
     const column = grid.columns.get(cell.column)!
@@ -157,9 +117,8 @@ export function useLayout() {
     const result = findRectAt(position)
     if (!result) return null
     const [rect,cell] = result
-    if (!rect) return null
     const gapRect = {
-      x: rect.x + rect.width, 
+      x: rect.x - initGap, 
       y: rect.y, 
       width: initGap, 
       height: rect.height
@@ -169,24 +128,27 @@ export function useLayout() {
   }, [findRectAt])
 
   // rect 限定区域
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const gridLinesInViewPort = useMemo((): GridLine => {
     // console.time("getGridLinesInViewPort")
-    const xList = [...grid.columns.values()].flatMap(v => [v.origin, v.origin + v.length])
-    const yList = [...grid.rows.values()].flatMap(v => [v.origin, v.origin + v.length])
+    const xList = [...grid.columns.values()].flatMap(v => [v.origin - initGap, v.origin])
+    if (gridCount.columnCount > 0) {
+      const lastColumn = grid.columns.get(gridCount.columnCount - 1)!
+      xList.push(lastColumn.origin + lastColumn.length)
+    }
+    const yList = [...grid.rows.values()].flatMap(v => [v.origin - initGap, v.origin])
+    if (gridCount.rowCount > 0) {
+      const lastRow = grid.rows.get(gridCount.rowCount - 1)!
+      yList.push(lastRow.origin + lastRow.length)
+    }
     
     // minXX 画边缘
     const result: GridLine = {
       xList,
       yList,
-      minX: xList[0],
-      maxX: xList[xList.length - 1],
-      minY: yList[0],
-      maxY: yList[yList.length - 1],
     }
     // console.timeEnd("getGridLinesInViewPort")
     return result
-  }, [grid])
+  }, [grid.columns, grid.rows, gridCount.columnCount, gridCount.rowCount])
 
   const moveAllNodeToRight = useCallback((baseCell: Cell, nodes: GridNode[]): GridNode[] => {
     return nodes.filter(node => node.data.column > baseCell.column)
@@ -211,13 +173,13 @@ export function useLayout() {
     }
   }, [])
 
-  const updateGrid = useCallback((cell: Cell, dimensions: Dimensions, nodes: GridNode[]) => {
+  const updateGrid = useCallback((nodes: GridNode[]) => {
     // console.time("updateRect")
     refreshMaxGridLines(nodes)
-    const newGrid = _updateGrid(cell, dimensions, grid)
+    const newGrid = buildGrid()
     // console.timeEnd("updateRect")
     setGrid(newGrid)
-  }, [_updateGrid, grid, refreshMaxGridLines, setGrid])
+  }, [buildGrid, refreshMaxGridLines, setGrid])
 
   return {
     getDefaultLayout,
@@ -227,7 +189,7 @@ export function useLayout() {
     gridLinesInViewPort,
     moveAllNodeToRight,
     findAdjacentNode,
-    updateRect: updateGrid,
+    updateGrid,
     grid,
   }
   
