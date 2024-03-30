@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeProps, OnResize } from 'reactflow';
 import { Handle, NodeResizeControl, Position } from 'reactflow';
 import TextEditor from './TextEditor';
@@ -6,23 +6,61 @@ import { useStoreLocal } from './store';
 import { GridNodeData, useReactFlowEx } from './util';
 import { useLayout } from './LayoutManager';
 
+type MouseHoverHandler = React.EffectCallback
+
+function useMouseHoverHandler(handler: MouseHoverHandler): [onMouseEnter: React.MouseEventHandler, onMouseLeave: React.MouseEventHandler] {
+  const disposeRef = useRef<ReturnType<MouseHoverHandler> | null>(null)
+
+  const onMouseEnter: React.MouseEventHandler = useCallback(() => {
+    disposeRef.current = handler()
+  }, [handler])
+
+  const onMouseLeave: React.MouseEventHandler = useCallback(() => {
+    if (disposeRef.current) {
+      disposeRef.current()
+      disposeRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const callback = () => {
+      if (document.hidden) {
+        if (disposeRef.current) {
+          disposeRef.current()
+          disposeRef.current = null
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', callback)
+    return () => document.removeEventListener('visibilitychange', callback)
+  }, [])
+
+  return [onMouseEnter, onMouseLeave]
+}
+
 export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
-  const [, setToolbarVisible] = useState(false);
+  // const [, setToolbarVisible] = useState(false);
   const handles = useStoreLocal(state => state.getHandles(nodeId));
   const isConnecting = useStoreLocal(state => state.isConnecting);
   const highlitedNodeIds = useStoreLocal(state => state.relatedNodeIds)
   const [highlited, setHighlited] = useState(false)
   const { updateGrid } = useLayout()
   const { getNodes } = useReactFlowEx()
+  const componentRef = useRef<HTMLDivElement>(null)
+  const [showControlHandle, setShowControlHandle] = useState(false)
+  const [onMouseEnter, onMouseLeave] = useMouseHoverHandler(() => {
+    setShowControlHandle(true)
+    return () => setShowControlHandle(false)
+  })
 
   useEffect(() => {
     const highlited = highlitedNodeIds.some(v => v === nodeId)
     setHighlited(highlited)
   }, [highlitedNodeIds, nodeId])
 
-  function hideToolbarDelay() {
-    setTimeout(() => setToolbarVisible(false), 500);
-  }
+  // function hideToolbarDelay() {
+  //   setTimeout(() => setToolbarVisible(false), 500);
+  // }
 
   const initHandles = (
     <>
@@ -42,6 +80,7 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
         isConnectableStart={true}
         isConnectableEnd={false}
         isConnectable={true}
+        style={{ visibility: `${showControlHandle? 'visible' : 'hidden'}`}}
         className='source-handle' />
     </>
   );
@@ -82,19 +121,24 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   return (
     <div
       className={`border-black w-full h-full rounded-md border-2 ${highlited ? 'bg-yellow-200' : ''}`}
-      onMouseEnter={() => setToolbarVisible(true)}
-      onMouseLeave={() => hideToolbarDelay()}
+      ref={componentRef}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <TextEditor nodeId={nodeId} text={data.text ?? ''} />
 
       {/* rest container */}
-      <NodeResizeControl 
-        className='resize-control' 
-        minWidth={100} minHeight={100}
-        onResize={onResize}>
-        <ResizeIcon />
-      </NodeResizeControl>
-      <div className='note-drag-handle' />
+      {showControlHandle && 
+        <div className='note-drag-handle' />
+      }
+      {showControlHandle && 
+        <NodeResizeControl 
+          className='resize-control' 
+          minWidth={100} minHeight={100}
+          onResize={onResize}>
+          <ResizeIcon />
+        </NodeResizeControl>
+      }
       {initHandles}
       {restHandles}
     </div>
