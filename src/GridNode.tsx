@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { NodeProps, OnResize } from 'reactflow';
+import type { NodeProps } from 'reactflow';
 import { Handle, NodeResizeControl, Position } from 'reactflow';
 import TextEditor from './TextEditor';
 import { useStoreLocal } from './store';
-import { GridNodeData, useReactFlowEx } from './util';
-import { useLayout } from './LayoutManager';
+import { GridNodeData } from './util';
 
 type MouseHoverHandler = React.EffectCallback
 
@@ -44,8 +43,6 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
   const isConnecting = useStoreLocal(state => state.isConnecting);
   const highlitedNodeIds = useStoreLocal(state => state.relatedNodeIds)
   const [highlited, setHighlited] = useState(false)
-  const { updateGrid } = useLayout()
-  const { getNodes } = useReactFlowEx()
   const componentRef = useRef<HTMLDivElement>(null)
   const [showControlHandle, setShowControlHandle] = useState(false)
   const [onMouseEnter, onMouseLeave] = useMouseHoverHandler(() => {
@@ -114,9 +111,9 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
     })
   )
 
-  const onResize: OnResize = useCallback(() => {
-    updateGrid(getNodes())
-  }, [getNodes, updateGrid])
+  // const onResize: OnResize = useCallback(() => {
+  //   updateGrid(getNodes())
+  // }, [getNodes, updateGrid])
 
   return (
     <div
@@ -135,7 +132,7 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
         <NodeResizeControl 
           className='resize-control' 
           minWidth={100} minHeight={100}
-          onResize={onResize}>
+        >
           <ResizeIcon />
         </NodeResizeControl>
       }

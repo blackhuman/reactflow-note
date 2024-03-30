@@ -61,6 +61,7 @@ export function findGapAtWithGrid(position: XYPosition, grid: Grid): [Rect, Cell
 export function useLayout() {
   const initLength = 100
   const initGap = 10
+  const additionalRedundancy = 5
 
   const [grid, setGrid, gridCount] = useStoreLocal(state => [state.grid, state.setGrid, state.gridCount])
   const maxGridLines = useStoreLocal(state => state.maxGridLines)
@@ -85,9 +86,14 @@ export function useLayout() {
     }
   }, [maxGridLines])
 
+  function getMaxRowAndColumn(nodes: GridNode[]): [number, number] {
+    const maxRow = Math.max(...nodes.map(node => node.data.row), 0) + additionalRedundancy
+    const maxColumn = Math.max(...nodes.map(node => node.data.column), 0) + additionalRedundancy
+    return [maxRow, maxColumn]
+  }
+
   const buildGrid = useCallback((nodes: GridNode[]): Grid => {
-    const maxRow = Math.max(...nodes.map(node => node.data.row), 0) + 5
-    const maxColumn = Math.max(...nodes.map(node => node.data.column), 0) + 5
+    const [maxRow, maxColumn] = getMaxRowAndColumn(nodes)
 
     const grid = {
       rows: new Map(),
@@ -96,7 +102,7 @@ export function useLayout() {
 
     let lastRowStop = initGap
     let lastColumnStop = initGap
-    for (let index = 0; index < maxRow; index++) {
+    for (let index = 0; index <= maxRow; index++) {
       const height = maxGridLines.rows.get(index) ?? initLength
       grid.rows.set(index, {
         index,
@@ -106,7 +112,7 @@ export function useLayout() {
       lastRowStop += height + initGap
     }
 
-    for (let index = 0; index < maxColumn; index++) {
+    for (let index = 0; index <= maxColumn; index++) {
       const width = maxGridLines.columns.get(index) ?? initLength
       grid.columns.set(index, {
         index,
@@ -115,8 +121,8 @@ export function useLayout() {
       })
       lastColumnStop += width + initGap
     }
-    gridCount.rowCount = maxRow
-    gridCount.columnCount = maxColumn
+    gridCount.rowCount = maxRow + 1
+    gridCount.columnCount = maxColumn + 1
     return grid
   }, [gridCount, maxGridLines.columns, maxGridLines.rows])
   
@@ -200,9 +206,19 @@ export function useLayout() {
 
   const updateGrid = useCallback((nodes: GridNode[]) => {
     // console.time("updateRect")
+
+    // const [maxRow, maxColumn] = getMaxRowAndColumn(nodes)
+    // const [maxGridRow, maxGridColumn] = [
+    //   Math.max(...[...grid.rows.keys()]),
+    //   Math.max(...[...grid.columns.keys()])
+    // ]
+    // console.log('maxRow', maxRow, 'maxColumn', maxColumn, 'maxGridRow', maxGridRow, 'maxGridColumn', maxGridColumn)
+    // if (maxRow == maxGridRow && maxColumn == maxGridColumn && !firstTime) return
+
     refreshMaxGridLines(nodes)
     const newGrid = buildGrid(nodes)
     // console.timeEnd("updateRect")
+
     setGrid(newGrid)
   }, [buildGrid, refreshMaxGridLines, setGrid])
 

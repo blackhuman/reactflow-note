@@ -21,8 +21,8 @@ function useCheckPositionInNode(): (position: XYPosition) => boolean {
 
 function App() {
 
-  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom, getEdges, getNodes } = useReactFlowEx()
-  const { findRectAt, findGapAt, updateGrid } = useLayout()
+  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom, getEdges } = useReactFlowEx()
+  const { findRectAt, findGapAt } = useLayout()
   const [currentRect, setCurrentRect] = useState<Rect|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
   const setConnecting = useStoreLocal(state => state.setConnecting)
@@ -51,8 +51,8 @@ function App() {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
     updateNodePosition(node.id, position)
     setCurrentRect(null)
-    updateGrid(getNodes())
-  }, [getNodes, screenToFlowPosition, updateGrid, updateNodePosition])
+    // updateGrid(getNodes())
+  }, [screenToFlowPosition, updateNodePosition])
 
   const onConnectStart: OnConnectStart = useCallback((_, params) => {
     connectStartRef.current = {...params}
@@ -195,8 +195,6 @@ function ReactFlowBase(props: ReactFlowProps) {
   const getFlow = useStoreLocal(state => state.getFlow)
   const [title, setTitle] = useState('')
   const navigate = useNavigate()
-  const [grid] = useStoreLocal(state => [state.grid, state.setGrid])
-  const {getRect, updateGrid} = useLayout()
 
   const restore = useCallback((flowData: GridReactFlowJsonObject) => {
     reset()
@@ -216,6 +214,8 @@ function ReactFlowBase(props: ReactFlowProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges])
 
+  // useEffect(() => updateGrid(nodes), [nodes, updateGrid])
+
   const onInit = useCallback(() => {
     console.log('onInit')
     const flowMeta = getFlow(flowId)!
@@ -228,7 +228,7 @@ function ReactFlowBase(props: ReactFlowProps) {
     const flowData = readFlowData(flowId)
     if (flowData) {
       console.log('restore flow', flowId, flowData)
-      updateGrid(flowData.nodes)
+      // updateGrid(flowData.nodes)
 
       if (flowData.nodes.length > 0) {
         restore(flowData)
@@ -240,17 +240,7 @@ function ReactFlowBase(props: ReactFlowProps) {
       throw new Error('flow not exist')
     }
 
-  }, [addNode, flowId, getFlow, navigate, restore, updateGrid])
-
-  useEffect(() => {
-    setNodes(nodes => {
-      return nodes.map(node => {
-        const rect = getRect(node.data)
-        node.position = rect
-        return node
-      })
-    })
-  }, [getRect, grid, setNodes])
+  }, [addNode, flowId, getFlow, navigate, restore])
 
   useEffect(() => {
     console.log('App mounted')

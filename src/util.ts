@@ -1,5 +1,5 @@
 import type { ConnectingHandle, Edge, Node, Rect, XYPosition } from 'reactflow';
-import { useEdgesState, useNodesState, useReactFlow, useUpdateNodeInternals } from 'reactflow';
+import { applyNodeChanges, useEdgesState, useNodesState, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
 import { useLayout } from './LayoutManager';
@@ -28,17 +28,28 @@ export type GridEdgeData = A
 export type GridNode = Node<GridNodeData>
 
 export const useNodesStateEx: typeof useNodesState<GridNodeData> = (initialItems) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialItems)
+  const [nodes, setNodes] = useNodesState(initialItems)
   const updateNodeInternals = useUpdateNodeInternals()
+  const { updateGrid, getRect } = useLayout()
   const setNodesEx: typeof setNodes = useCallback((nodes) => {
     setNodes(nodes)
     if (typeof nodes === 'function') return
+    updateGrid(nodes)
     updateNodeInternals(nodes.map(node => node.id))
-  }, [setNodes, updateNodeInternals])
+  }, [setNodes, updateGrid, updateNodeInternals])
   return [
     nodes,
     setNodesEx,
-    onNodesChange,
+    (changes) => {
+      const newNodes = applyNodeChanges(changes, nodes)
+      updateGrid(newNodes)
+      const updatedNodes = newNodes.map(node => {
+        const rect = getRect(node.data)
+        node.positionAbsolute = rect
+        return node
+      })
+      setNodes(updatedNodes)
+    },
   ]
 }
 
@@ -76,14 +87,14 @@ export function useReactFlowEx() {
   const [addHandle, deleteHandle] = useStoreLocal(state => [state.addHandle, state.deleteHandle])
   const updateNodeInternals = useUpdateNodeInternals()
   const {addEdges} = useReactFlow()
-  const layoutManager = useLayout()
+  const {getRect, findRectAt, findAdjacentNode, moveAllNodeToRight} = useLayout()
 
   function addNode(position: XYPosition, findInGrid: boolean = true): string | null {
     const nodes = getNodes()
     let rect: Rect = {x: position.x, y: position.y, width: 100, height: 100}
     let cell: Cell = {row: 0, column: 0}
     if (findInGrid) {
-      [rect, cell] = layoutManager.findRectAt(position)!
+      [rect, cell] = findRectAt(position)!
     }
     const isNodeExist = nodes.some(n => n.data.row === cell.row && n.data.column === cell.column)
     if (isNodeExist) return null
@@ -103,8 +114,8 @@ export function useReactFlowEx() {
     
     nodes.push(node)
     setNodes(nodes)
-    const leftNode = layoutManager.findAdjacentNode(node, 'left', nodes)
-    const rightNode = layoutManager.findAdjacentNode(node, 'right', nodes)
+    const leftNode = findAdjacentNode(node, 'left', nodes)
+    const rightNode = findAdjacentNode(node, 'right', nodes)
 
     // 插入到两个Node中间时
     if (leftNode && rightNode) {
@@ -139,7 +150,7 @@ export function useReactFlowEx() {
   }
   function insertNode(cell: Cell): void {
     const nodes = getNodes()
-    const targetNodes = layoutManager.moveAllNodeToRight({
+    const targetNodes = moveAllNodeToRight({
       row: cell.row, 
       column: cell.column
     }, nodes).reduce((acc, node) => {
@@ -155,13 +166,13 @@ export function useReactFlowEx() {
         return node
       }
     }))
-    const rect = layoutManager.getRect(cell)
+    const rect = getRect(cell)
     addNode(rect)
   }
   function deleteNode(node: GridNode) {
     const nodes = getNodes()
-    const leftNode = layoutManager.findAdjacentNode(node, 'left', nodes)
-    const rightNode = layoutManager.findAdjacentNode(node, 'right', nodes)
+    const leftNode = findAdjacentNode(node, 'left', nodes)
+    const rightNode = findAdjacentNode(node, 'right', nodes)
 
     if (leftNode && rightNode) {
       addEdge(
@@ -173,7 +184,7 @@ export function useReactFlowEx() {
   function updateNodePosition(nodeId: string, position: XYPosition): void {
     setNodes(nodes => nodes.map(n => {
       if (n.id !== nodeId) return n
-      const [rect, cell] = layoutManager.findRectAt(position)!
+      const [rect, cell] = findRectAt(position)!
       n.position = rect
       n.data = {...n.data, ...cell}
       return n
