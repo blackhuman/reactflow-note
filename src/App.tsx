@@ -21,8 +21,8 @@ function useCheckPositionInNode(): (position: XYPosition) => boolean {
 
 function App() {
 
-  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom, getEdges } = useReactFlowEx()
-  const layoutManager = useLayout()
+  const { screenToFlowPosition, flowToScreenPosition, addNode, hasNode, addEdge, afterDeleteEdge, insertNode, updateNodePosition, deleteNode, getNode, getZoom, getEdges, getNodes } = useReactFlowEx()
+  const { findRectAt, findGapAt, updateGrid } = useLayout()
   const [currentRect, setCurrentRect] = useState<Rect|null>(null)
   const connectStartRef = useRef<OnConnectStartParams>()
   const setConnecting = useStoreLocal(state => state.setConnecting)
@@ -43,15 +43,16 @@ function App() {
 
   const onNodeDrag: NodeDragHandler = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
-    const [rect,] = layoutManager.findRectAt(position)!
+    const [rect,] = findRectAt(position)!
     setCurrentRect(rect)
-  }, [layoutManager, screenToFlowPosition])
+  }, [findRectAt, screenToFlowPosition])
 
   const onNodeDragStop: NodeDragHandler = useCallback((event, node) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
     updateNodePosition(node.id, position)
     setCurrentRect(null)
-  }, [screenToFlowPosition, updateNodePosition])
+    updateGrid(getNodes())
+  }, [getNodes, screenToFlowPosition, updateGrid, updateNodePosition])
 
   const onConnectStart: OnConnectStart = useCallback((_, params) => {
     connectStartRef.current = {...params}
@@ -61,7 +62,7 @@ function App() {
   const onPaneMouseMove: React.MouseEventHandler = useCallback((event) => {
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
 
-    const gap = layoutManager.findGapAt(position)
+    const gap = findGapAt(position)
     if (gap) {
       const zoom = getZoom()
       const {x: width, y: height} = {x: gap.rect.width * zoom, y: gap.rect.height * zoom}
@@ -71,9 +72,9 @@ function App() {
     setGap(gap)
 
     if (connectStartRef.current === undefined) return
-    const [rect] = layoutManager.findRectAt(position)!
+    const [rect] = findRectAt(position)!
     setCurrentRect(rect)
-  }, [flowToScreenPosition, getZoom, layoutManager, screenToFlowPosition])
+  }, [findGapAt, findRectAt, flowToScreenPosition, getZoom, screenToFlowPosition])
 
   const onConnectEnd: OnConnectEnd = useCallback((event) => {
     if (event instanceof TouchEvent) return
@@ -87,7 +88,7 @@ function App() {
 
     // for create in empty cell
     const position = screenToFlowPosition({x: event.clientX, y: event.clientY})
-    const [rect,cell] = layoutManager.findRectAt(position)!
+    const [rect,cell] = findRectAt(position)!
     if (hasNode(cell)) return
     const target = addNode(rect)
     if (target === null) return
@@ -98,7 +99,7 @@ function App() {
         { nodeId: target, type: 'target' }
       )
     }
-  }, [getNode, setConnecting, screenToFlowPosition, layoutManager, hasNode, addNode, addEdge])
+  }, [getNode, setConnecting, screenToFlowPosition, findRectAt, hasNode, addNode, addEdge])
 
   const onConnect = useCallback((params: Connection) => {
     const { source, target } = params
@@ -194,8 +195,8 @@ function ReactFlowBase(props: ReactFlowProps) {
   const getFlow = useStoreLocal(state => state.getFlow)
   const [title, setTitle] = useState('')
   const navigate = useNavigate()
-  const [grid, setGrid] = useStoreLocal(state => [state.grid, state.setGrid])
-  const {getRect, getDefaultLayout} = useLayout()
+  const [grid] = useStoreLocal(state => [state.grid, state.setGrid])
+  const {getRect, updateGrid} = useLayout()
 
   const restore = useCallback((flowData: GridReactFlowJsonObject) => {
     reset()
@@ -227,8 +228,7 @@ function ReactFlowBase(props: ReactFlowProps) {
     const flowData = readFlowData(flowId)
     if (flowData) {
       console.log('restore flow', flowId, flowData)
-      const grid = getDefaultLayout(flowData.nodes)
-      setGrid(grid)
+      updateGrid(flowData.nodes)
 
       if (flowData.nodes.length > 0) {
         restore(flowData)
@@ -240,7 +240,7 @@ function ReactFlowBase(props: ReactFlowProps) {
       throw new Error('flow not exist')
     }
 
-  }, [addNode, flowId, getDefaultLayout, getFlow, navigate, restore, setGrid])
+  }, [addNode, flowId, getFlow, navigate, restore, updateGrid])
 
   useEffect(() => {
     setNodes(nodes => {

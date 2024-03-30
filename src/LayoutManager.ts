@@ -60,7 +60,6 @@ export function findGapAtWithGrid(position: XYPosition, grid: Grid): [Rect, Cell
 
 export function useLayout() {
   const initLength = 100
-  const initCount = 10
   const initGap = 10
 
   const [grid, setGrid, gridCount] = useStoreLocal(state => [state.grid, state.setGrid, state.gridCount])
@@ -86,7 +85,10 @@ export function useLayout() {
     }
   }, [maxGridLines])
 
-  const buildGrid = useCallback((): Grid => {
+  const buildGrid = useCallback((nodes: GridNode[]): Grid => {
+    const maxRow = Math.max(...nodes.map(node => node.data.row), 0) + 5
+    const maxColumn = Math.max(...nodes.map(node => node.data.column), 0) + 5
+
     const grid = {
       rows: new Map(),
       columns: new Map(),
@@ -94,7 +96,7 @@ export function useLayout() {
 
     let lastRowStop = initGap
     let lastColumnStop = initGap
-    for (let index = 0; index < initCount; index++) {
+    for (let index = 0; index < maxRow; index++) {
       const height = maxGridLines.rows.get(index) ?? initLength
       grid.rows.set(index, {
         index,
@@ -102,7 +104,9 @@ export function useLayout() {
         length: height
       })
       lastRowStop += height + initGap
+    }
 
+    for (let index = 0; index < maxColumn; index++) {
       const width = maxGridLines.columns.get(index) ?? initLength
       grid.columns.set(index, {
         index,
@@ -111,15 +115,10 @@ export function useLayout() {
       })
       lastColumnStop += width + initGap
     }
-    gridCount.rowCount = initCount
-    gridCount.columnCount = initCount
+    gridCount.rowCount = maxRow
+    gridCount.columnCount = maxColumn
     return grid
   }, [gridCount, maxGridLines.columns, maxGridLines.rows])
-  
-  const getDefaultLayout = useCallback((nodes: GridNode[]): Grid => {
-    refreshMaxGridLines(nodes)
-    return buildGrid()
-  }, [buildGrid, refreshMaxGridLines])
   
   const getRect = useCallback((cell: Cell): Rect => {
     const row = grid.rows.get(cell.row)!
@@ -193,11 +192,16 @@ export function useLayout() {
       return nodes[index + 1]
     }
   }, [])
+  
+  const getDefaultLayout = useCallback((nodes: GridNode[]): Grid => {
+    refreshMaxGridLines(nodes)
+    return buildGrid(nodes)
+  }, [buildGrid, refreshMaxGridLines])
 
   const updateGrid = useCallback((nodes: GridNode[]) => {
     // console.time("updateRect")
     refreshMaxGridLines(nodes)
-    const newGrid = buildGrid()
+    const newGrid = buildGrid(nodes)
     // console.timeEnd("updateRect")
     setGrid(newGrid)
   }, [buildGrid, refreshMaxGridLines, setGrid])
