@@ -68,10 +68,8 @@ export function useGridChange(callback: (grid: Grid) => void) {
     const listener = (event: CustomEvent<Grid>) => {
       callback(event.detail)
     }
-    // @ts-ignore xx
     document.addEventListener('gridChange', listener)
     return () => {
-      // @ts-ignore xx
       document.removeEventListener('gridChange', listener)
     }
   }, [callback])
