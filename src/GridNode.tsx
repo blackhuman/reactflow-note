@@ -111,10 +111,6 @@ export function GridNode({ data, id: nodeId }: NodeProps<GridNodeData>) {
     })
   )
 
-  // const onResize: OnResize = useCallback(() => {
-  //   updateGrid(getNodes())
-  // }, [getNodes, updateGrid])
-
   return (
     <div
       className={`border-black w-full h-full rounded-md border-2 ${highlited ? 'bg-yellow-200' : ''}`}
@@ -161,3 +157,4 @@ function ResizeIcon() {
     </svg>
   );
 }
+

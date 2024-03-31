@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect } from "react"
 import type { Rect } from 'reactflow'
 import { XYPosition } from "reactflow"
 import { Column, Row, useStoreLocal } from './store'
@@ -58,15 +58,34 @@ export function findGapAtWithGrid(position: XYPosition, grid: Grid): [Rect, Cell
   ]
 }
 
+export function dispatchGridChangeEvent(grid: Grid) {
+  const event = new CustomEvent<Grid>('gridChange', {detail: grid})
+  document.dispatchEvent(event)
+}
+
+export function useGridChange(callback: (grid: Grid) => void) {
+  useEffect(() => {
+    const listener = (event: CustomEvent<Grid>) => {
+      callback(event.detail)
+    }
+    // @ts-ignore xx
+    document.addEventListener('gridChange', listener)
+    return () => {
+      // @ts-ignore xx
+      document.removeEventListener('gridChange', listener)
+    }
+  }, [callback])
+}
+
 export function useLayout() {
   const initLength = 100
   const initGap = 10
   const additionalRedundancy = 5
 
-  const [grid, setGrid, gridCount] = useStoreLocal(state => [state.grid, state.setGrid, state.gridCount])
-  const maxGridLines = useStoreLocal(state => state.maxGridLines)
+  const [gridRef, setGrid] = useStoreLocal(state => [state.gridRef, state.setGrid])
 
   const refreshMaxGridLines = useCallback((nodes: GridNode[]) => {
+    const maxGridLines = gridRef.maxGridLines
     maxGridLines.rows.clear()
     maxGridLines.columns.clear()
     for (const node of nodes) {
@@ -84,7 +103,7 @@ export function useLayout() {
         maxGridLines.columns = maxGridLines.columns.set(column, width)
       }
     }
-  }, [maxGridLines])
+  }, [gridRef])
 
   function getMaxRowAndColumn(nodes: GridNode[]): [number, number] {
     const maxRow = Math.max(...nodes.map(node => node.data.row), 0) + additionalRedundancy
@@ -94,6 +113,8 @@ export function useLayout() {
 
   const buildGrid = useCallback((nodes: GridNode[]): Grid => {
     const [maxRow, maxColumn] = getMaxRowAndColumn(nodes)
+    const maxGridLines = gridRef.maxGridLines
+    const gridCount = gridRef.gridCount
 
     const grid = {
       rows: new Map(),
@@ -124,23 +145,24 @@ export function useLayout() {
     gridCount.rowCount = maxRow + 1
     gridCount.columnCount = maxColumn + 1
     return grid
-  }, [gridCount, maxGridLines.columns, maxGridLines.rows])
+  }, [gridRef])
   
   const getRect = useCallback((cell: Cell): Rect => {
+    const grid = gridRef.grid
     const row = grid.rows.get(cell.row)!
     const column = grid.columns.get(cell.column)!
     return {x: column.origin, y: row.origin, width: column.length, height: row.length}
-  }, [grid])
+  }, [gridRef])
 
   const findRectAt = useCallback((position: XYPosition): [Rect, Cell] | null => {
-    const result = findRectAtWithGrid(position, grid)
+    const result = findRectAtWithGrid(position, gridRef.grid)
     // console.log('findRectAt result', result)
     return result
-  }, [grid])
+  }, [gridRef])
 
   // cell width is not included gap
   const findGapAt = useCallback((position: XYPosition): Gap | null => {
-    const result = findGapAtWithGrid(position, grid)
+    const result = findGapAtWithGrid(position, gridRef.grid)
     if (!result) return null
     const [rect,cell] = result
     const gapRect = {
@@ -151,11 +173,13 @@ export function useLayout() {
     }
     if (isContains(gapRect, position)) return {rect: gapRect, cell}
     return null
-  }, [grid])
+  }, [gridRef])
 
   // rect 限定区域
-  const gridLinesInViewPort = useMemo((): GridLine => {
+  const getGridLinesInViewPort = useCallback((): GridLine => {
     // console.time("getGridLinesInViewPort")
+    const grid = gridRef.grid
+    const gridCount = gridRef.gridCount
     const xList = [...grid.columns.values()].flatMap(v => [v.origin - initGap, v.origin])
     if (gridCount.columnCount > 0) {
       const lastColumn = grid.columns.get(gridCount.columnCount - 1)!
@@ -174,7 +198,7 @@ export function useLayout() {
     }
     // console.timeEnd("getGridLinesInViewPort")
     return result
-  }, [grid.columns, grid.rows, gridCount.columnCount, gridCount.rowCount])
+  }, [gridRef])
 
   const moveAllNodeToRight = useCallback((baseCell: Cell, nodes: GridNode[]): GridNode[] => {
     return nodes.filter(node => node.data.column >= baseCell.column)
@@ -220,6 +244,7 @@ export function useLayout() {
     // console.timeEnd("updateRect")
 
     setGrid(newGrid)
+    dispatchGridChangeEvent(newGrid)
   }, [buildGrid, refreshMaxGridLines, setGrid])
 
   return {
@@ -227,11 +252,11 @@ export function useLayout() {
     getRect,
     findRectAt,
     findGapAt,
-    gridLinesInViewPort,
+    getGridLinesInViewPort,
     moveAllNodeToRight,
     findAdjacentNode,
     updateGrid,
-    grid,
+    gridRef,
   }
   
 }

@@ -1,4 +1,4 @@
-import type { ConnectingHandle, Edge, Node, Rect, XYPosition } from 'reactflow';
+import type { ConnectingHandle, Edge, Node, NodePositionChange, Rect, XYPosition } from 'reactflow';
 import { applyNodeChanges, useEdgesState, useNodesState, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './App.css';
@@ -42,10 +42,14 @@ export const useNodesStateEx: typeof useNodesState<GridNodeData> = (initialItems
     setNodesEx,
     (changes) => {
       const newNodes = applyNodeChanges(changes, nodes)
+      const positionChangeNodeIds = changes.filter(change => change.type === 'position')
+        .map(change => (change as NodePositionChange).id)
+
       updateGrid(newNodes)
       const updatedNodes = newNodes.map(node => {
+        if (positionChangeNodeIds.includes(node.id)) return node
         const rect = getRect(node.data)
-        node.positionAbsolute = rect
+        node.position = rect
         return node
       })
       setNodes(updatedNodes)

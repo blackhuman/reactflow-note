@@ -26,6 +26,18 @@ export type Row = {
 
 export type Column = Row
 
+type GridEx = {
+  grid: Grid
+  gridCount: {
+    rowCount: number,
+    columnCount: number,
+  }
+  maxGridLines: {
+    rows: Map<number, number>
+    columns: Map<number, number>
+  }
+}
+
 export type AppStore = {
   isConnecting: boolean
   setConnecting(isConnecting: boolean): void
@@ -36,16 +48,16 @@ export type AppStore = {
   deleteHandle(handle: ConnectingHandle): void
   relatedNodeIds: string[]
   setHighlitedNodeIds(nodeIds: string[]): void
-  grid: Grid
-  gridCount: {
-    rowCount: number,
-    columnCount: number,
-  }
+  gridRef: GridEx
+  // gridCount: {
+  //   rowCount: number,
+  //   columnCount: number,
+  // }
   setGrid(grid: Grid): void
-  maxGridLines: {
-    rows: Map<number, number>
-    columns: Map<number, number>
-  }
+  // maxGridLines: {
+  //   rows: Map<number, number>
+  //   columns: Map<number, number>
+  // }
 }
 
 export const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) => {
@@ -93,21 +105,20 @@ export const baseStore: StateCreator<AppStore, [], [], AppStore> = (set, get) =>
       console.log('setHighlitedNodeIds', nodeIds)
       set({relatedNodeIds: [...nodeIds]})
     },
-    grid: {
-      rows: new Map(),
-      columns: new Map(),
-    },
-    gridCount: {
-      rowCount: 0,
-      columnCount: 0,
+    gridRef: {
+      grid: {rows: new Map(), columns: new Map()},
+      gridCount: {
+        rowCount: 0,
+        columnCount: 0,
+      },
+      maxGridLines: {
+        rows: new Map(),
+        columns: new Map(),
+      },
     },
     setGrid(grid) {
-      set({grid})
+      get().gridRef.grid = grid
     },
-    maxGridLines: {
-      rows: new Map(),
-      columns: new Map(),
-    }
   }
 }
 

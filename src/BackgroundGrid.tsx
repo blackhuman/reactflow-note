@@ -1,5 +1,6 @@
 import { Rect, useStoreApi, useViewport } from "reactflow"
-import { useLayout, GridLine } from "./LayoutManager"
+import { useLayout, GridLine, useGridChange } from "./LayoutManager"
+import { useState } from "react"
 
 interface BackgroundGridComponentProps {
   currentRect: Rect | null
@@ -10,13 +11,18 @@ function BackgroundGridComponent(props: BackgroundGridComponentProps) {
   const store = useStoreApi()
   const {width, height} = store.getState()
   const { x, y, zoom } = useViewport()
-  const {gridLinesInViewPort} = useLayout()
+  const {getGridLinesInViewPort} = useLayout()
+  const [gridLine, setGridLine] = useState<GridLine>({xList: [], yList: []})
+  
+  useGridChange(() => {
+    setGridLine(getGridLinesInViewPort())
+  })
   
   return (
     <BackgroundGrid 
       containerHeight={height}
       containerWidth={width}
-      gridLine={gridLinesInViewPort} 
+      gridLine={gridLine} 
       viewBox={`${-x/zoom} ${-y/zoom} ${width/zoom} ${height/zoom}`} 
       currentRect={currentCell}
       />
